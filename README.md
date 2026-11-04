@@ -214,7 +214,32 @@ Outputs:
 
 ---
 
-## 7. Known Limitations & Integrity Commitments
+## 7. Kaggle Cloud GPU Execution
+
+For fast, accelerated training on genuine MMAct data, a ready-to-run Jupyter notebook is provided at [`notebooks/kaggle_mmact_har.ipynb`](notebooks/kaggle_mmact_har.ipynb).
+
+### Kaggle Setup:
+1. **Create a Kaggle Notebook:** Upload `notebooks/kaggle_mmact_har.ipynb` to Kaggle.
+2. **Attach Dataset:** Click **+ Add Input** in the top right to attach your uploaded MMAct dataset (supports either pre-extracted `data/genuine_mmact` or the raw ZIP archives: `trimmed_sensor.zip`, `trimmed_splits.zip`, `trimmed_x-scene_subject16.zip`, `trimmed_x-scene_subject8.zip`).
+3. **Configure Settings:**
+   - **Accelerator:** `GPU T4 x2` or `GPU P100` (Settings sidebar -> Accelerator)
+   - **Internet:** `On` (Settings sidebar -> Internet)
+4. **Run All Cells:**
+   - Step 1 verifies CUDA GPU detection and memory.
+   - Step 2 clones `https://github.com/CHENNAMSETTYVIKRAM/HAR-MMAct.git` and installs requirements.
+   - Step 3 locates and links the dataset from `/kaggle/input/`.
+   - Step 4 runs the exact 3-epoch benchmark on genuine MMAct data:
+     ```bash
+     python scripts/train.py --data_root data/genuine_mmact --epochs 3 --batch_size 8 --split_strategy subject
+     ```
+   - Step 5 performs standalone multimodal vs. unimodal test evaluations.
+   - Step 6 displays all loss, accuracy, confusion matrix, ROC, and PR plots inline.
+   - Step 7 tests single-sample multimodal inference.
+   - Step 8 packages all artifacts into `/kaggle/working/mmact_benchmark_results.zip` for instant one-click download.
+
+---
+
+## 8. Known Limitations & Integrity Commitments
 
 1. **Dataset Availability:**
    - The workspace contains `test_set_cross-view_1.zip` (14.99 GB, 13,869 unlabelled `.mp4` video files with obfuscated names for the CodaLab challenge leaderboard).
