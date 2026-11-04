@@ -105,6 +105,128 @@ def plot_training_curves(
     plt.close(fig)
 
 
+def plot_loss_curve_standalone(
+    train_losses: List[float],
+    val_losses: List[float],
+    output_path: Union[str, Path],
+    num_layers: int = 4,
+) -> None:
+    """
+    Plots standalone 'Train vs Validation Loss ({num_layers} Layers, {epochs} Epochs)'.
+    """
+    output_path = Path(output_path)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+
+    num_epochs = len(train_losses)
+    epochs = list(range(num_epochs))
+
+    fig, ax = plt.subplots(figsize=(7, 4.5))
+    ax.plot(epochs, train_losses, label="Train Loss", color="#2b6cb0", lw=1.8)
+    ax.plot(epochs, val_losses, label="Validation Loss", color="#dd6b20", lw=1.8)
+    ax.set_title(f"Train vs Validation Loss ({num_layers} Layers, {num_epochs} Epochs)", fontsize=11)
+    ax.set_xlabel("Epochs", fontsize=10)
+    ax.set_ylabel("Loss", fontsize=10)
+    ax.legend(loc="upper right", frameon=True)
+    ax.grid(True, color="#cbd5e0", linestyle="-", linewidth=0.7, alpha=0.7)
+
+    fig.tight_layout()
+    plt.savefig(output_path, dpi=200, bbox_inches="tight")
+    plt.close(fig)
+
+
+def plot_accuracy_curve_standalone(
+    train_accs: List[float],
+    eval_accs: List[float],
+    output_path: Union[str, Path],
+    eval_label: str = "Validation",
+    num_layers: int = 4,
+) -> None:
+    """
+    Plots standalone 'Train vs {Validation/Test} Accuracy ({num_layers} Layers, {epochs} Epochs)'.
+    """
+    output_path = Path(output_path)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+
+    num_epochs = len(train_accs)
+    epochs = list(range(num_epochs))
+
+    # Normalize to 0-1 if in percent (0-100)
+    t_acc = [a / 100.0 if a > 1.0 else a for a in train_accs]
+    e_acc = [a / 100.0 if a > 1.0 else a for a in eval_accs]
+
+    fig, ax = plt.subplots(figsize=(7, 4.5))
+    ax.plot(epochs, t_acc, label="Train Accuracy", color="#2b6cb0", lw=1.8)
+    ax.plot(epochs, e_acc, label=f"{eval_label} Accuracy", color="#dd6b20", lw=1.8)
+    ax.set_title(f"Train vs {eval_label} Accuracy ({num_layers} Layers, {num_epochs} Epochs)", fontsize=11)
+    ax.set_xlabel("Epochs" if eval_label == "Validation" else "Epoch", fontsize=10)
+    ax.set_ylabel("Accuracy", fontsize=10)
+    ax.legend(loc="lower right", frameon=True)
+    ax.grid(True, color="#cbd5e0", linestyle="-", linewidth=0.7, alpha=0.7)
+
+    fig.tight_layout()
+    plt.savefig(output_path, dpi=200, bbox_inches="tight")
+    plt.close(fig)
+
+
+def plot_annotated_train_test_accuracy(
+    train_accs: List[float],
+    test_accs: List[float],
+    output_path: Union[str, Path],
+) -> None:
+    """
+    Plots 'Train Accuracy vs Test Accuracy ({epochs} Epochs)' styled with
+    square markers and final value callout arrows.
+    """
+    output_path = Path(output_path)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+
+    num_epochs = len(train_accs)
+    epochs = list(range(1, num_epochs + 1))
+
+    # Scale to percentage (0 - 100)
+    t_acc = [a * 100.0 if a <= 1.0 else a for a in train_accs]
+    te_acc = [a * 100.0 if a <= 1.0 else a for a in test_accs]
+
+    fig, ax = plt.subplots(figsize=(8, 4.8))
+    # Sample markers periodically or all
+    mark_every = max(1, num_epochs // 10)
+    ax.plot(epochs, t_acc, label="Train Accuracy", color="#0000cd", lw=2, marker="s", markersize=4, markevery=mark_every)
+    ax.plot(epochs, te_acc, label="Test Accuracy", color="#cc1100", lw=2, marker="s", markersize=4, markevery=mark_every)
+
+    final_train = t_acc[-1]
+    final_test = te_acc[-1]
+
+    # Annotations
+    ax.annotate(
+        f"Final Train: {final_train:.1f}%",
+        xy=(num_epochs, final_train),
+        xytext=(num_epochs - max(3, num_epochs // 8), final_train - 4),
+        arrowprops=dict(arrowstyle="->", color="#0000cd", lw=1.2),
+        fontsize=8.5,
+        ha="center",
+    )
+    ax.annotate(
+        f"Final Test: {final_test:.1f}%",
+        xy=(num_epochs, final_test),
+        xytext=(num_epochs - max(3, num_epochs // 8), final_test - 8),
+        arrowprops=dict(arrowstyle="->", color="#cc1100", lw=1.2),
+        fontsize=8.5,
+        ha="center",
+    )
+
+    ax.set_title(f"Train Accuracy vs Test Accuracy ({num_epochs} Epochs)", fontsize=11, fontweight="bold")
+    ax.set_xlabel("Epochs", fontsize=10, fontweight="bold")
+    ax.set_ylabel("Accuracy (%)", fontsize=10, fontweight="bold")
+    ax.set_xlim([1, num_epochs + 1])
+    ax.set_ylim([min(min(t_acc), min(te_acc)) - 5, max(max(t_acc), max(te_acc)) + 5])
+    ax.legend(loc="lower right", shadow=True)
+    ax.grid(True, color="#e2e8f0", linestyle="-", linewidth=0.8)
+
+    fig.tight_layout()
+    plt.savefig(output_path, dpi=200, bbox_inches="tight")
+    plt.close(fig)
+
+
 def plot_multiclass_roc(
     y_true: np.ndarray,
     y_prob: np.ndarray,

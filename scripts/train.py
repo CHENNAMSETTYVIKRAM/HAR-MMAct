@@ -32,6 +32,8 @@ from src.models.fusion_model import MultimodalHARModel
 from src.utils.metrics import compute_classification_metrics
 from src.utils.plots import (
     plot_training_curves,
+    plot_loss_curve_standalone,
+    plot_accuracy_curve_standalone,
     plot_confusion_matrix,
     plot_multiclass_roc,
     plot_multiclass_pr,
@@ -198,7 +200,14 @@ def main():
 
     # 4. Model Setup
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    print(f"\n[Step 4] Initializing MultimodalHARModel on device: {device}")
+    if device.type == "cuda":
+        gpu_name = torch.cuda.get_device_name(0)
+        gpu_cap = torch.cuda.get_device_capability(0)
+        print(f"\n[Step 4] Initializing MultimodalHARModel on device: {device} ({gpu_name}, Compute Capability {gpu_cap[0]}.{gpu_cap[1]})")
+        print(f"  - CUDA Device Count    : {torch.cuda.device_count()}")
+        print(f"  - Initial Allocated Mem: {torch.cuda.memory_allocated(0) / (1024**2):.2f} MB")
+    else:
+        print(f"\n[Step 4] Initializing MultimodalHARModel on device: {device} (CUDA not available, running on CPU)")
     model = MultimodalHARModel(
         num_classes=len(VERIFIED_TARGET_CLASSES),
         video_channels=3,
@@ -308,6 +317,23 @@ def main():
         plots_dir / "training_curves.png",
     )
     print(f"  - Saved training curves to: {plots_dir / 'training_curves.png'}")
+
+    plot_loss_curve_standalone(
+        history["train_loss"],
+        history["val_loss"],
+        plots_dir / "train_vs_val_loss.png",
+        num_layers=4,
+    )
+    print(f"  - Saved standalone loss curve to: {plots_dir / 'train_vs_val_loss.png'}")
+
+    plot_accuracy_curve_standalone(
+        history["train_acc"],
+        history["val_acc"],
+        plots_dir / "train_vs_val_accuracy.png",
+        eval_label="Validation",
+        num_layers=4,
+    )
+    print(f"  - Saved standalone validation accuracy curve to: {plots_dir / 'train_vs_val_accuracy.png'}")
 
     if best_metrics and "confusion_matrix" in best_metrics:
         cm_array = np.array(best_metrics["confusion_matrix"])

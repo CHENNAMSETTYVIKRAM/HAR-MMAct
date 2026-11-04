@@ -59,6 +59,10 @@ def main():
     classes = checkpoint.get("classes", VERIFIED_TARGET_CLASSES)
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    if device.type == "cuda":
+        print(f"Using inference device: {device} ({torch.cuda.get_device_name(0)})")
+    else:
+        print(f"Using inference device: {device} (CPU)")
     model = MultimodalHARModel(
         num_classes=len(classes),
         video_channels=3,

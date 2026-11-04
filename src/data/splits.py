@@ -79,9 +79,21 @@ class DatasetSplitter:
                 val_set = {all_subjects[-2]}
                 train_set = set(all_subjects[:-2])
             elif n_total == 2:
-                train_set = {all_subjects[0]}
-                val_set = {all_subjects[1]}
-                test_set = {all_subjects[1]}
+                # 2 subjects: assign first subject to train, partition second subject by session for val & test
+                train_subj = all_subjects[0]
+                eval_subj = all_subjects[1]
+                train_set = {train_subj}
+
+                eval_samples = [s for s in samples if s.subject == eval_subj]
+                eval_sessions = sorted(list({(s.subject, s.scene, s.session) for s in eval_samples}))
+                n_half = max(1, len(eval_sessions) // 2)
+                val_sessions = set(eval_sessions[:n_half])
+                test_sessions = set(eval_sessions[n_half:])
+
+                train = [s for s in samples if s.subject in train_set]
+                val = [s for s in eval_samples if (s.subject, s.scene, s.session) in val_sessions]
+                test = [s for s in eval_samples if (s.subject, s.scene, s.session) in test_sessions]
+                return train, val, test
             else:
                 return self._split_by_session(samples)
         else:
@@ -92,6 +104,15 @@ class DatasetSplitter:
         train = [s for s in samples if s.subject in train_set]
         val = [s for s in samples if s.subject in val_set]
         test = [s for s in samples if s.subject in test_set]
+
+        # If test set is empty because of limited available subjects, partition val by session
+        if len(test) == 0 and len(val) > 1:
+            val_sessions = sorted(list({(s.subject, s.scene, s.session) for s in val}))
+            n_half = max(1, len(val_sessions) // 2)
+            v_sess = set(val_sessions[:n_half])
+            t_sess = set(val_sessions[n_half:])
+            test = [s for s in val if (s.subject, s.scene, s.session) in t_sess]
+            val = [s for s in val if (s.subject, s.scene, s.session) in v_sess]
 
         return train, val, test
 

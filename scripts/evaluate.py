@@ -132,6 +132,11 @@ def main():
 
     # Initialize model and load weights
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    if device.type == "cuda":
+        gpu_name = torch.cuda.get_device_name(0)
+        print(f"Using evaluation device: {device} ({gpu_name})")
+    else:
+        print(f"Using evaluation device: {device} (CPU)")
     model = MultimodalHARModel(
         num_classes=len(classes),
         video_channels=3,

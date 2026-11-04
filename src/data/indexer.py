@@ -240,10 +240,35 @@ class MMActIndexer:
                 report.duplicate_ids.append(f"video:{key}")
             video_map[key] = vid_file
 
-        # 2. Discover all sensors
+        # 2. Discover relevant sensors
         # Key: (subject, scene, session, action) -> {sensor_type: path}
         sensor_map: Dict[Tuple[str, str, str, str], Dict[str, Path]] = {}
-        for sen_file in self.dataset_root.glob("**/*.csv"):
+        video_subjects = {k[0] for k in video_map.keys()}
+
+        # Optimization: if sensor directory exists, scan only subdirectories matching video subjects
+        sensor_files: List[Path] = []
+        possible_sensor_roots = [
+            self.dataset_root / "trimmed" / "sensors",
+            self.dataset_root / "sensors",
+            self.dataset_root,
+        ]
+        scanned_targeted = False
+        for s_root in possible_sensor_roots:
+            if s_root.exists() and s_root != self.dataset_root:
+                scanned_targeted = True
+                for clip_dir in s_root.iterdir():
+                    if clip_dir.is_dir():
+                        for v_subj in video_subjects:
+                            target_s_dir = clip_dir / v_subj
+                            if target_s_dir.exists():
+                                for sen_file in target_s_dir.rglob("*.csv"):
+                                    sensor_files.append(sen_file)
+                break
+
+        if not scanned_targeted or len(sensor_files) == 0:
+            sensor_files = list(self.dataset_root.glob("**/*.csv"))
+
+        for sen_file in sensor_files:
             report.total_sensor_files_found += 1
             parsed = self.parse_sensor_path(sen_file)
             if not parsed:
