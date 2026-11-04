@@ -1,0 +1,39 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+.venv/
+
+# Pytest / Coverage
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Caches and Temporary Data
+outputs/cache/
+outputs/checkpoints/
+*.pt
+*.pth
+
+# Dataset Archives and Media
+*.zip
+*.tar
+*.tar.gz
+*.mp4
+*.avi
+test_set_cross-view_1/
+data/synthetic_smoke_test/
+data/downloads/
+data/genuine_mmact/
+SS/
+
+# Large PDF documents
+*.pdf
+
+# Operating System files
+.DS_Store
+Thumbs.db

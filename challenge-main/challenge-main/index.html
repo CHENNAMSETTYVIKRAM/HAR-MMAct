@@ -1,0 +1,684 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <!-- Required meta tags -->
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+  <meta name="keywords" content="Hitachi, Vision, MMAct, Action Recognition, Multi modal, Cross modal, Computer Science, Video, CVPR, ActivityNet">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+  <title>MMAct Challenge</title>
+
+  <!-- Bootstrap CSS -->
+  <link rel="stylesheet" href="css/bootstrap.min.css">
+  <link rel="stylesheet" href="css/font-awesome.min.css">
+  <link rel="stylesheet" href="css/line-icons.css">
+  <link rel="stylesheet" href="css/owl.carousel.css">
+  <link rel="stylesheet" href="css/owl.theme.css">
+  <link rel="stylesheet" href="css/nivo-lightbox.css">
+  <link rel="stylesheet" href="css/magnific-popup.css">
+  <link rel="stylesheet" href="css/slicknav.css">
+  <link rel="stylesheet" href="css/animate.css">
+  <link rel="stylesheet" href="css/main.css">
+  <link rel="stylesheet" href="css/responsive.css">
+
+  <meta name="google-site-verification" content="w38WFDi8CbdXbSbPa8E_aXMhZXP85T_bZOEoi4jrhtY" />
+
+</head>
+
+<body>
+
+  <!-- Header Section Start -->
+  <header id="hero-area" data-stellar-background-ratio="0.5">
+    <!-- Navbar Start -->
+    <nav class="navbar navbar-expand-lg fixed-top scrolling-navbar indigo">
+      <div class="container">
+        <!-- Brand and toggle get grouped for better mobile display -->
+        <div class="navbar-header">
+          <a href="index.html" class="navbar-brand"><img class="img-fulid" src="img/logo.png" height="75" width="160" alt=""></a>
+          <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#main-navbar" aria-controls="main-navbar" aria-expanded="false" aria-label="Toggle navigation">
+            <i class="lnr lnr-menu"></i>
+          </button>
+        </div>
+        <div class="collapse navbar-collapse" id="main-navbar">
+          <ul class="navbar-nav mr-auto w-100 justify-content-end">
+            <li class="nav-item">
+              <a class="nav-link page-scroll" href="#hero-area">Home</a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link page-scroll" href="#overview">Overview</a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link page-scroll" href="#features">Features</a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link page-scroll" href="#task">Task</a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link page-scroll" href="#downloads">Downloads</a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link page-scroll" href="#teams">Teams</a>
+            </li>
+          </ul>
+        </div>
+      </div>
+
+      <!-- Mobile Menu Start -->
+      <ul class="mobile-menu">
+        <li>
+          <a class="page-scroll" href="#hero-area">Home</a>
+        </li>
+        <li>
+          <a class="page-scroll" href="#overview">Overview</a>
+        </li>
+        <li>
+          <a class="page-scroll" href="#features">Features</a>
+        </li>
+        <li>
+          <a class="page-scroll" href="#task">Task</a>
+        </li>
+        <li>
+          <a class="page-scroll" href="#downloads">Downloads</a>
+        </li>
+        <li>
+          <a class="page-scroll" href="#teams">Teams</a>
+        </li>
+      </ul>
+      <!-- Mobile Menu End -->
+
+    </nav>
+    <!-- Navbar End -->
+    <div class="container">
+      <div class="row justify-content-md-center">
+        <div class="col-md-10">
+          <div class="contents text-center">
+            <h1 class="wow fadeInDown" data-wow-duration="1000ms" data-wow-delay="0.3s">MMAct Challenge in conjunction with ActivityNet @ CVPR2021</h1>
+            <h2 class="lead wow fadeIn" data-wow-duration="1000ms" data-wow-delay="400ms">
+              </p>
+              <a href="#downloads" class="btn btn-common wow fadeInUp" data-wow-duration="1000ms" data-wow-delay="400ms">Dataset Download</a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </header>
+  <!-- Header Section End -->
+
+  <!-- News Section Start -->
+  <section id="date" class="section" style="background:#f6f5f5;">
+    <div class="container">
+      <div class="section-header">
+        <h2 class="section-title wow fadeIn" data-wow-duration="1000ms" data-wow-delay="0.3s">Important Dates</h2>
+        <hr class="lines wow zoomIn" data-wow-delay="0.3s">
+        <ul class="section-subsubtitle wow fadeIn" data-wow-duration="1000ms" data-wow-delay="0.3s">
+          <li>
+            <p>-2021.04.05. Challenge open! Train and Val set released <a class="page-scroll" href="#downloads">here</a>.</p>
+          </li>
+          <li>
+            <p>-2021.05.01. <a href=https://github.com/mmact19/challenge#evaluation-for-validation-set>Evaluation script</a>, <a href=https://github.com/mmact19/challenge#test-set-submission-format-for-leaderboard>submission format</a> and <a
+                href="https://ent.box.com/s/gz113lr0m33gmkvb9vuw6cs1k9s71nhc">test data</a> (password is the same as trainval request) released!</p>
+          </li>
+          <li>
+            <p>-2021.05.07. Evaluation server open on CodaLab <a href=https://competitions.codalab.org/competitions/31438>task1 link</a> and <a href=https://competitions.codalab.org/competitions/31385>task2 link</a>.</p>
+          </li>
+          <li>
+            <p>-2021.06.12. Evaluation server close. (extended)</p>
+          </li>
+          <li>
+            <p>-2021.06.14. Deadline for submitting the report.</p>
+          </li>
+          <li>
+            <p>-2021.06.19. Workshop day at CVPR 2021. Check <a href="http://activity-net.org/challenges/2021/program.html">program</a> and <a href="#result">Results</a></p>
+          </li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- News Section Start -->
+  <section id="overview" class="section">
+    <div class="container">
+      <div class="section-header">
+        <h2 class="section-title wow fadeIn" data-wow-duration="1000ms" data-wow-delay="0.3s">Challenge Overview</h2>
+        <hr class="lines wow zoomIn" data-wow-delay="0.3s">
+      </div>
+      <p>The MMAct Challenge 2021 will be hosted in the <a href="http://activity-net.org/challenges/2021/index.html">CVPR'21 International Challenge on Activity Recognition (ActivityNet) Workshop.</a>
+        This challenge asks participants to propose cross-modal video action recognition/localization approaches for addressing shortcomings in visual only approaches using <a href="https://mmact19.github.io/2019/">MMAct Dataset</a>.
+        The goal of this task is to leverage the sensor-based, e.g. body-worn sensors data as the privilege information, and vision-based modalities in ways that can overcome the limitations imposed by modality discrepancy between
+        train (sensor + video) and test (only video, including keypoints) phases. The modalities used for this challenge are: <b>Acceleration, Orientation, Gyroscope, RGB video, and Keypoints.</b>
+        This challenge promotes an alternate point of view on how to address vision challenges
+        through using cross-modal methods in the hopes of expanding research on video action understanding to further leverage the sensors commonly embedded in
+        daily-use smart devices (e.g., smartphones).<br><br>
+        <b>Winners will be announced at ActivityNet Workshop at CVPR 2021, along with Prizes sponsored by <a href="https://www.hitachi.com/rd/">Hitachi, Ltd.</a> and subject to changes.</b>
+      </p>
+    </div>
+  </section>
+  <!-- News Section End -->
+
+  <!-- Features Section Start -->
+  <section id="features" class="section" data-stellar-background-ratio="0.2">
+    <div class="container">
+      <div class="section-header">
+        <h2 class="section-title">MMAct Challenge Dataset Features</h2>
+        <hr class="lines">
+        <p class="section-subtitle">A large-scale multi modal dataset for action understanding</p>
+      </div>
+      <div class="row">
+        <div class="col-lg-12 col-md-12 col-xs-12">
+          <div class="container">
+            <div class="row">
+              <div class="col-lg-3 col-sm-3 col-xs-12 box-item">
+                <span class="icon">
+                  <i class="lnr lnr-database"></i>
+                </span>
+                <div class="text">
+                  <h4>5 modalities</h4>
+                  <p>RGB, Keypoints, Acceleration, Gyroscope, Orientation.</p>
+                </div>
+              </div>
+              <div class="col-lg-3 col-sm-3 col-xs-12 box-item">
+                <span class="icon">
+                  <i class="lnr lnr-camera-video"></i>
+                </span>
+                <div class="text">
+                  <h4>1600+ Videos</h4>
+                  <p>Untrimmed videos with 1920x1080@30FPS</p>
+                </div>
+              </div>
+              <div class="col-lg-3 col-sm-3 col-xs-12 box-item">
+                <span class="icon">
+                  <i class="lnr lnr-film-play"></i>
+                </span>
+                <div class="text">
+                  <h4>32k Clips</h4>
+                  <p>Average clip length ranges from 3-8 seconds.</p>
+                </div>
+              </div>
+              <div class="col-lg-3 col-sm-3 col-xs-12 box-item">
+                <span class="icon">
+                  <i class="lnr lnr-layers"></i>
+                </span>
+                <div class="text">
+                  <h4>35 Classes</h4>
+                  <p>Daily, Abnormal, Desk work actions</p>
+                </div>
+              </div>
+              <div class="col-lg-3 col-sm-3 col-xs-12 box-item">
+                <span class="icon">
+                  <i class="lnr lnr-home"></i>
+                </span>
+                <div class="text">
+                  <h4>4 Scenes</h4>
+                  <p>Free space, Occlusion, Station Entrance, Desk work.</p>
+                </div>
+              </div>
+              <div class="col-lg-3 col-sm-3 col-xs-12 box-item">
+                <span class="icon">
+                  <i class="lnr lnr-camera"></i>
+                </span>
+                <div class="text">
+                  <h4>4 Views</h4>
+                  <p>4 surveillance camera views</p>
+                </div>
+              </div>
+              <div class="col-lg-3 col-sm-3 col-xs-12 box-item">
+                <span class="icon">
+                  <i class="lnr lnr-users"></i>
+                </span>
+                <div class="text">
+                  <h4>20 Subjects</h4>
+                  <p>10 female, 10 male</p>
+                </div>
+              </div>
+              <div class="col-lg-3 col-sm-3 col-xs-12 box-item">
+                <span class="icon">
+                  <i class="lnr lnr-move"></i>
+                </span>
+                <div class="text">
+                  <h4>Randomness</h4>
+                  <p>Collected using a semi-naturalistic collection protocol.</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+  <!-- Features Section End -->
+
+  <!-- Task Section -->
+  <section id="task" class="section">
+    <!-- Container Starts -->
+    <div class="container">
+      <div class="section-header">
+        <h2 class="section-title">TASK1: Cross-Modal Action Recognition</h2>
+        <hr class="lines">
+      </div>
+      <div class="row">
+        <div>
+          <p style="text-align:left">In this task, participants will use trimmed videos from MMAct along with paired sensor data.
+            This task allows the participants to train with trimmed sensor data and trimmed video, but test on only trimmed video for action recognition.
+            It requries the user to submit two results according to the follows two different splits. External datasets for pre-training are allowed as long as clearly stated in the report.
+            Submissions that use only the vision-based modality in the train phase are also welcome!
+            To encourage the submissions contributed on cross-modal methods, there will be a special award selected from the participants who use cross-modal manner.
+          </p>
+        </div>
+        <div>
+          <h5><b>MMAct trimmed cross-view dataset:</b></h5>
+          <ul class="section-subsubtitle">
+            <li>
+              <p>・clips from multiple views for training and validation, clips from unseen views for testing.</p>
+            </li>
+            <li>
+              <p>・35 action classes from 20 subjects with four scenes.</p>
+            </li>
+            <li>
+              <p>・<i>MMAct untrimmed dataset and MMAct trimmed cross-scene dataset are NOT permitted in this task.</i></p>
+            </li>
+          </ul>
+        </div>
+        <div>
+          <h5><b>MMAct trimmed cross-scene dataset:</b></h5>
+          <ul class="section-subsubtitle">
+            <li>
+              <p>・clips from 3 scenes (Free space, Desk, Entrance) for training and validation, clips from 3 scenes (Occlusion, Desk, Entrance) for testing.</p>
+            </li>
+            <li>
+              <p>・35 action classes from 20 subjects with four camera views.</p>
+            </li>
+            <li>
+              <p>・<i>MMAct untrimmed dataset and MMAct trimmed cross-view dataset are NOT permitted in this task.</i></p>
+            </li>
+          </ul>
+        </div>
+      </div>
+
+      <br>
+
+      <div class="section-header">
+        <h2 class="section-title">TASK2: Cross-Modal Action Temporal Localization</h2>
+        <hr class="lines">
+      </div>
+      <div class="row">
+        <p style="text-align:left">In this task, participants will use untrimmed paired sensor data and video for training,
+          then test on only untrimmed videos for temporal action localization with the output being the recognized action class and its start and end time in the untrimmed video.
+          External datasets for pre-training are allowed as long as clearly stated in the report. Submissions that use only the vision-based modality in the train phase are also welcome!
+          To encourage the submissions contributed on cross-modal methods, there will be a special award selected from the participants who use cross-modal manner.
+          <i>Notice that Keypoints are NOT provided in this task.</i>
+        </p>
+      </div>
+      <div>
+        <h5><b>MMAct untrimmed cross-session dataset:</b></h5>
+        <ul class="section-subsubtitle">
+          <li>
+            <p>・~9k untrimmed videos for training and validation, and the other untrimmed videos for testing.</p>
+          </li>
+          <li>
+            <p>・35 action classes from 20 subjects with four camera views and four scenes.</p>
+          </li>
+          <li>
+            <p>・<i>MMAct trimmed cross-view dataset and cross-scene dataset are NOT permitted in this task.</i></p>
+          </li>
+        </ul>
+      </div>
+
+    </div>
+    <!-- Container Ends -->
+  </section>
+  <!-- Task Section Ends -->
+  <!-- News Section Start -->
+  <section id="result" class="section">
+    <div class="container">
+      <div class="section-header">
+        <h2 class="section-title wow fadeIn" data-wow-duration="1000ms" data-wow-delay="0.3s">Results</h2>
+        <hr class="lines wow zoomIn" data-wow-delay="0.3s">
+        <div align="center">
+          <table>
+            <thead>
+              <tr>
+                <th colspan="6">TASK1: Cross-Modal Trimmed Action Recognition</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td></td>
+                <td><b>Organization</b></td>
+                <td><b>x-scene AP</b></td>
+                <td><b>x-view AP</b></td>
+                <td><b>mAP</b></td>
+                <td><b>Report</b></td>
+              </tr>
+              <tr>
+                <td>1</td>
+                <td>DeepBlue Technology</td>
+                <td>0.9716</td>
+                <td>0.9449</td>
+                <td>0.9583</td>
+                <td><a href="assets/report/DeepblueAI-Challenge report for MMAct Challenge.pdf">PDF</a></td>
+              </tr>
+              <tr>
+                <td>2</td>
+                <td>OPPO Research Institute</td>
+                <td>0.9468</td>
+                <td>0.9108</td>
+                <td>0.9288</td>
+                <td><a href="assets/report/OPPO_mmact_challenge_report.pdf">PDF</a></td>
+              </tr>
+              <tr>
+                <td>3</td>
+                <td>University of Koblenz</td>
+                <td>0.8064</td>
+                <td>0.6748</td>
+                <td>0.7406</td>
+                <td><a href="assets/report/Raphael_unified_action_recognition_with_various_modalities.pdf">PDF</a></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div align="center">
+          <table>
+            <thead>
+              <tr>
+                <th colspan="4">TASK2: Cross-Modal Untrimmed Action Detection</th>
+              </tr>
+              <tr>
+                <td></td>
+                <td><b>Organization</b></td>
+                <td><b>AP</b></td>
+                <td><b>Report</b></td>
+              </tr>
+              <tr>
+                <td>1</td>
+                <td>DeepBlue Technology</td>
+                <td>0.4457</td>
+                <td><a href="assets/report/DeepblueAI-Challenge report for MMAct Challenge.pdf">PDF</a></td>
+              </tr>
+              <tr>
+                <td>2</td>
+                <td>OPPO Research Institute</td>
+                <td>0.4068</td>
+                <td><a href="assets/report/OPPO_mmact_challenge_report.pdf">PDF</a></td>
+              </tr>
+              </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Downloads Section Start -->
+  <section id="downloads" class="section">
+    <div class="container">
+      <div class="section-header">
+        <h2 class="section-title">Download</h2>
+        <hr class="lines">
+      </div>
+      <div class="row">
+        <div class="col-md-12">
+          <h3>Dataset</h3>
+          <h5>Please follow this <a href="https://docs.google.com/forms/d/e/1FAIpQLSdg-6E1ogV5VNA9GxhpAG8ehlBWtEH-UTgPPxYWe6d9fLdfqw/viewform">link</a> to download the challenge dataset.
+          </h5>
+
+          <br>
+
+          <h3>Preparation</h3>
+          <h5>You can use the dev-kit from <a href="https://github.com/mmact19/challenge">this page</a> when preparing your entry.
+          </h5>
+          <!-- <aside>
+          Note: entire dataset will open soon.
+        </aside> -->
+
+          <br>
+
+          <div class="section-header">
+            <h2 class="section-title">Evaluation Metrics</h2>
+            <hr class="lines">
+          </div>
+          <p>Evaluation script can be found here:<a href="https://github.com/mmact19/challenge#evaluation">evaluation script</a></p>
+          <p><b>Task 1. Cross-Modal Trimmed Action Recognition:</b>
+            The evaluation will be done across <i>MMAct trimmed cross-view dataset</i> and <i>MMAct trimmed cross-scene dataset</i>.
+            We will use the mean Average Precision (mAP) as our metric, and the winner of this challenge will be selected based on the average of this metric across the above two datasets.
+          </p>
+          <p><b>Task 2. Cross-Modal Untrimmed Action Temporal Localization:</b>
+            We will use the Interpolated Average Precision (AP) as our evaluation metric, which is also used by <a href="http://activity-net.org/challenges/2020/tasks/anet_localization.html">ActivityNet</a>.
+            The winner will be selected based on this metric evaluated on <i>MMAct untrimmed cross-session dataset</i>.
+          </p>
+
+          <br>
+
+          <div class="section-header">
+            <h2 class="section-title">Submission</h2>
+            <hr class="lines">
+          </div>
+
+          <p>For Task1 submission format (cross-view and cross-scene are the same) and Task2 submission format, please refer it here: <a href="https://github.com/mmact19/challenge/blob/main/README.md#test-set-submission-format-for-leaderboard">Test
+              set Submission format for Leaderboard</a></p>
+
+        </div>
+      </div>
+    </div>
+  </section>
+  <!-- Downloads Section End -->
+
+  <section id="teams" class="section">
+    <div class="container">
+      <div class="section-header">
+        <h2 class="section-title">Teams</h2>
+        <hr class="lines">
+        <p class="section-subtitle">Organizer</p>
+      </div>
+      <div class="row">
+        <div class="col-lg-2 col-md-4 col-xs-6">
+          <div class="single-team" align="center">
+            <a href="https://fusionk.github.io/quankong/"><img src="img/team/quankong.png" alt=""></a>
+            <div class="team-details">
+              <div class="team-inner">
+                <h4 class="team-title">Quan<br> Kong</h4>
+                <p>Hitachi, Ltd.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="col-lg-2 col-md-4 col-xs-8">
+          <div class="single-team" align="center">
+            <a href="https://scholar.google.co.jp/citations?hl=en&user=ZIxQ5zAAAAAJ"><img src="img/team/nakamura.png" alt=""></a>
+            <div class="team-details">
+              <div class="team-inner">
+                <h4 class="team-title">Katsuyuki Nakamura</h4>
+                <p>Hitachi, Ltd.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="col-lg-2 col-md-4 col-xs-8">
+          <div class="single-team">
+            <a href="http://hirokatsukataoka.net"><img src="img/team/hirokatsu_min.png" alt=""></a>
+            <div class="team-details">
+              <div class="team-inner">
+                <h4 class="team-title">Hirokatsu Kataoka</h4>
+                <p>AIST</p>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="col-lg-2 col-md-4 col-xs-8">
+          <div class="single-team">
+            <a href="http://www.satoh-lab.nii.ac.jp/"><img src="img/team/satoshinichi.jpg" alt=""></a>
+            <div class="team-details">
+              <div class="team-inner">
+                <h4 class="team-title">Shin'ichi Satoh</h4>
+                <p>NII</p>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="col-lg-2 col-md-4 col-xs-8">
+          <div class="single-team">
+            <a href="http://www-nishio.ist.osaka-u.ac.jp/~maekawa/index-e.html"><img src="img/team/maekawa-face-2018.png" alt=""></a>
+            <div class="team-details">
+              <div class="team-inner">
+                <h4 class="team-title">Takuya Maekawa</h4>
+                <p>Osaka Univ.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <br>
+      <div class="section-header">
+        <hr class="lines">
+        <p class="section-subtitle">Committee Member</p>
+      </div>
+      <div class="row">
+        <div class="col-lg-2 col-md-4 col-xs-6">
+          <div class="single-team">
+            <a href="mailto:joseph.korpela.kp@hitachi.com"><img src="img/team/Korpela.png" alt=""></a>
+            <div class="team-details">
+              <div class="team-inner">
+                <h4 class="team-title">Joseph Korpela</h4>
+                <p>Hitachi, Ltd.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="col-lg-2 col-md-4 col-xs-8">
+          <div class="single-team">
+            <a href="https://kenshohara.github.io"><img src="img/team/kenshohara.png" alt=""></a>
+            <div class="team-details">
+              <div class="team-inner">
+                <h4 class="team-title">Kensho Hara</h4>
+                <p>AIST</p>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="col-lg-2 col-md-4 col-xs-8">
+          <div class="single-team">
+            <a href="mailto:yoshiki.ito.xf@hitachi.com"><img src="img/team/ito.jpeg" alt=""></a>
+            <div class="team-details">
+              <div class="team-inner">
+                <h4 class="team-title">Yoshiki <br>Ito</h4>
+                <p>Hitachi, Ltd.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="col-lg-2 col-md-4 col-xs-8">
+          <div class="single-team">
+            <a href="mailto:saptarshi.sinha.hx@hitachi.com"><img src="img/team/sinha.jpeg" alt=""></a>
+            <div class="team-details">
+              <div class="team-inner">
+                <h4 class="team-title">Saptarshi Sinha</h4>
+                <p>Hitachi, Ltd.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="Reference" class="section" style="background:#f6f5f5;">
+    <div class="container">
+      <div class="section-header">
+        <h2 class="section-title">Reference</h2>
+        <hr class="lines">
+        <p class="section-subtitle">Please cite the following paper if you use the dataset.</p>
+      </div>
+      <div class="row">
+        <div class="col-md-12">
+          <h3>Publications</h3>
+          <a href="http://openaccess.thecvf.com/content_ICCV_2019/papers/Kong_MMAct_A_Large-Scale_Dataset_for_Cross_Modal_Human_Action_Understanding_ICCV_2019_paper.pdf"><img src="img/mmactpaper.png" width="100%" alt="" /></a>
+          <p></p>
+          <h4>Bibtex</h4>
+          <pre style="font-size:15px;">
+        @InProceedings{Kong_2019_ICCV,
+          author = {Kong, Quan and Wu, Ziming and Deng, Ziwei and Klinkigt, Martin and Tong, Bin and Murakami, Tomokazu},
+          title = {MMAct: A Large-Scale Dataset for Cross Modal Human Action Understanding},
+          booktitle = {The IEEE International Conference on Computer Vision (ICCV)},
+          month = {October},
+          year = {2019}
+        }
+        </pre>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Footer Section Start -->
+  <footer>
+    <div class="container">
+      <div class="row">
+        <!-- Footer Links -->
+        <div class="col-lg-6 col-sm-6 col-xs-12">
+          <ul class="footer-links">
+            <li>
+              <a href="#">Homepage</a>
+            </li>
+            <li>
+              <a href="#news">Overview</a>
+            </li>
+            <li>
+              <a href="#features">Features</a>
+            </li>
+            <li>
+              <a href="#teams">Task</a>
+            </li>
+            <li>
+              <a href="#downloads">Downloads</a>
+            </li>
+            <li>
+              <a href="#teams">Teams</a>
+            </li>
+          </ul>
+        </div>
+        <div class="col-lg-6 col-sm-6 col-xs-12">
+          <div class="copyright">
+            <p>For general enquiries, the contact address is<img src="img/email.png" width="50%" alt="" /></a></p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </footer>
+  <!-- Footer Section End -->
+
+  <!-- Go To Top Link -->
+  <a href="#" class="back-to-top">
+    <i class="lnr lnr-arrow-up"></i>
+  </a>
+
+  <div id="loader">
+    <div class="spinner">
+      <div class="double-bounce1"></div>
+      <div class="double-bounce2"></div>
+    </div>
+  </div>
+
+  <!-- jQuery first, then Tether, then Bootstrap JS. -->
+  <script src="js/jquery-min.js"></script>
+  <script src="js/popper.min.js"></script>
+  <script src="js/bootstrap.min.js"></script>
+  <script src="js/jquery.mixitup.js"></script>
+  <script src="js/nivo-lightbox.js"></script>
+  <script src="js/owl.carousel.js"></script>
+  <script src="js/jquery.stellar.min.js"></script>
+  <script src="js/jquery.nav.js"></script>
+  <script src="js/scrolling-nav.js"></script>
+  <script src="js/jquery.easing.min.js"></script>
+  <script src="js/smoothscroll.js"></script>
+  <script src="js/jquery.slicknav.js"></script>
+  <script src="js/wow.js"></script>
+  <script src="js/jquery.vide.js"></script>
+  <script src="js/jquery.counterup.min.js"></script>
+  <script src="js/jquery.magnific-popup.min.js"></script>
+  <script src="js/waypoints.min.js"></script>
+  <script src="js/form-validator.min.js"></script>
+  <script src="js/contact-form-script.js"></script>
+  <script src="js/main.js"></script>
+
+</body>
+
+</html>

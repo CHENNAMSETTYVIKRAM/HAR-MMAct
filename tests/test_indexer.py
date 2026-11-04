@@ -1,0 +1,51 @@
+"""
+test_indexer.py - Tests for multimodal dataset indexing and diagnostic anomaly reporting
+"""
+
+from pathlib import Path
+import pytest
+
+from src.config import ProjectConfig, VERIFIED_TARGET_CLASSES
+from src.data.indexer import MMActIndexer
+from src.data.synthetic import generate_synthetic_fixture
+
+
+@pytest.fixture(scope="module")
+def synthetic_dataset_dir(tmp_path_factory):
+    tmp_dir = tmp_path_factory.mktemp("synthetic_mmact")
+    generate_synthetic_fixture(
+        tmp_dir,
+        num_subjects=3,
+        num_cams=2,
+        include_test_anomalies=True,
+    )
+    return tmp_dir
+
+
+def test_indexer_finds_paired_samples(synthetic_dataset_dir):
+    indexer = MMActIndexer(dataset_root=synthetic_dataset_dir)
+    report = indexer.index()
+
+    # 3 subjects * 2 scenes * 1 session * 2 cams * 10 classes = 120 paired samples
+    assert report.paired_samples_count == 120
+    assert len(report.paired_samples) == 120
+
+    # Every verified target class must have paired samples
+    for cls_name in VERIFIED_TARGET_CLASSES:
+        assert report.class_distribution[cls_name] == 12
+
+
+def test_indexer_filters_unknown_labels(synthetic_dataset_dir):
+    indexer = MMActIndexer(dataset_root=synthetic_dataset_dir)
+    report = indexer.index()
+
+    # Anomaly file 'drinking.mp4' must be filtered as an unknown label
+    assert any("drinking" in path for path in report.unknown_label_files)
+
+
+def test_indexer_handles_nonexistent_dir(tmp_path):
+    empty_dir = tmp_path / "does_not_exist"
+    indexer = MMActIndexer(dataset_root=empty_dir)
+    report = indexer.index()
+    assert report.paired_samples_count == 0
+    assert report.total_video_files_found == 0
