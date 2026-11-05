@@ -44,6 +44,15 @@ from src.utils.plots import (
 )
 
 
+def get_git_commit_hash() -> str:
+    try:
+        import subprocess
+        out = subprocess.check_output(["git", "rev-parse", "HEAD"], stderr=subprocess.DEVNULL)
+        return out.decode("utf-8").strip()
+    except Exception:
+        return "unknown"
+
+
 def parse_args():
     parser = argparse.ArgumentParser(description="Train Multimodal HAR Model on MMAct")
     parser.add_argument("--data_root", type=str, default="data/genuine_mmact", help="Root directory of dataset")
@@ -67,32 +76,58 @@ def parse_args():
     parser.add_argument("--output_dir", type=str, default="outputs", help="Directory for artifacts")
     parser.add_argument("--cache_dir", type=str, default="outputs/cache", help="Cache directory for preprocessed tensors")
     parser.add_argument("--num_workers", type=int, default=0, help="DataLoader workers")
+    parser.add_argument("--prefetch_factor", type=int, default=2, help="DataLoader prefetch factor (when num_workers > 0)")
+    parser.add_argument("--pin_memory", action="store_true", default=True, help="Enable DataLoader pin_memory (default: True)")
+    parser.add_argument("--no_amp", action="store_true", help="Disable Automatic Mixed Precision (AMP)")
+    parser.add_argument("--cudnn_benchmark", action="store_true", default=True, help="Enable cuDNN benchmark autotuner")
+    parser.add_argument("--benchmark_warmup", action="store_true", help="Run 1-batch calibration forward/backward check before full training")
     parser.add_argument("--seed", type=int, default=42, help="Random seed")
     parser.add_argument("--smoke_test", action="store_true", help="Force run on synthetic data for end-to-end pipeline verification")
     return parser.parse_args()
 
 
-def train_one_epoch(model, loader, criterion, optimizer, device, mode):
+def train_one_epoch(model, loader, criterion, optimizer, device, mode, scaler=None, use_amp=False):
     model.train()
     total_loss = 0.0
     correct = 0
     total = 0
 
-    for video, sensor, label, _ in loader:
-        video = video.to(device)
-        sensor = sensor.to(device)
-        label = label.to(device)
+    for batch_idx, (video, sensor, label, _) in enumerate(loader):
+        video = video.to(device, non_blocking=True)
+        sensor = sensor.to(device, non_blocking=True)
+        label = label.to(device, non_blocking=True)
 
-        optimizer.zero_grad()
-        logits = model(video=video, sensor=sensor, override_mode=mode)
-        loss = criterion(logits, label)
-        loss.backward()
-        optimizer.step()
+        optimizer.zero_grad(set_to_none=True)
 
-        total_loss += loss.item() * len(label)
-        preds = logits.argmax(dim=-1)
+        try:
+            if use_amp and device.type == "cuda" and scaler is not None:
+                with torch.amp.autocast(device_type="cuda", dtype=torch.float16):
+                    logits = model(video=video, sensor=sensor, override_mode=mode)
+                    loss = criterion(logits, label)
+                scaler.scale(loss).backward()
+                scaler.step(optimizer)
+                scaler.update()
+            else:
+                logits = model(video=video, sensor=sensor, override_mode=mode)
+                loss = criterion(logits, label)
+                loss.backward()
+                optimizer.step()
+        except (torch.cuda.OutOfMemoryError, RuntimeError) as e:
+            if "out of memory" in str(e).lower():
+                torch.cuda.empty_cache()
+                raise RuntimeError(
+                    f"\n[CUDA OOM] Out of memory encountered during training batch {batch_idx} (batch size {len(label)}).\n"
+                    f"Model: {mode}, Allocated: {torch.cuda.memory_allocated() / (1024**2):.1f} MB, "
+                    f"Reserved: {torch.cuda.memory_reserved() / (1024**2):.1f} MB.\n"
+                    f"Remedy: Reduce --batch_size (e.g. from {len(label)} to {max(1, len(label)//2)}) and re-run."
+                ) from e
+            raise e
+
+        batch_size = len(label)
+        total_loss += loss.detach().item() * batch_size
+        preds = logits.detach().argmax(dim=-1)
         correct += (preds == label).sum().item()
-        total += len(label)
+        total += batch_size
 
     avg_loss = total_loss / total if total > 0 else 0.0
     accuracy = (correct / total * 100.0) if total > 0 else 0.0
@@ -100,7 +135,7 @@ def train_one_epoch(model, loader, criterion, optimizer, device, mode):
 
 
 @torch.no_grad()
-def evaluate(model, loader, criterion, device, mode, class_names):
+def evaluate(model, loader, criterion, device, mode, class_names, use_amp=False):
     model.eval()
     total_loss = 0.0
     all_preds = []
@@ -108,15 +143,21 @@ def evaluate(model, loader, criterion, device, mode, class_names):
     all_probs = []
 
     for video, sensor, label, _ in loader:
-        video = video.to(device)
-        sensor = sensor.to(device)
-        label = label.to(device)
+        video = video.to(device, non_blocking=True)
+        sensor = sensor.to(device, non_blocking=True)
+        label = label.to(device, non_blocking=True)
 
-        logits = model(video=video, sensor=sensor, override_mode=mode)
-        loss = criterion(logits, label)
+        if use_amp and device.type == "cuda":
+            with torch.amp.autocast(device_type="cuda", dtype=torch.float16):
+                logits = model(video=video, sensor=sensor, override_mode=mode)
+                loss = criterion(logits, label)
+        else:
+            logits = model(video=video, sensor=sensor, override_mode=mode)
+            loss = criterion(logits, label)
+
         probs = torch.softmax(logits, dim=-1)
 
-        total_loss += loss.item() * len(label)
+        total_loss += loss.detach().item() * len(label)
         all_preds.extend(logits.argmax(dim=-1).cpu().numpy())
         all_labels.extend(label.cpu().numpy())
         all_probs.append(probs.cpu().numpy())
@@ -207,19 +248,54 @@ def main():
     train_ds = MMActMultimodalDataset(train_samples, cache_dir=cache_path / "train", enable_cache=True)
     val_ds = MMActMultimodalDataset(val_samples, cache_dir=cache_path / "val", enable_cache=True)
 
-    train_loader = DataLoader(train_ds, batch_size=args.batch_size, shuffle=True, num_workers=args.num_workers)
-    val_loader = DataLoader(val_ds, batch_size=args.batch_size, shuffle=False, num_workers=args.num_workers)
-
-    # 4. Model Setup
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    pin_mem = (device.type == "cuda") and args.pin_memory
+    persistent = (args.num_workers > 0)
+    prefetch = args.prefetch_factor if args.num_workers > 0 else None
+
+    train_loader = DataLoader(
+        train_ds,
+        batch_size=args.batch_size,
+        shuffle=True,
+        num_workers=args.num_workers,
+        pin_memory=pin_mem,
+        persistent_workers=persistent,
+        prefetch_factor=prefetch,
+    )
+    val_loader = DataLoader(
+        val_ds,
+        batch_size=args.batch_size,
+        shuffle=False,
+        num_workers=args.num_workers,
+        pin_memory=pin_mem,
+        persistent_workers=persistent,
+        prefetch_factor=prefetch,
+    )
+
+    # 4. Model Setup & Hardware Acceleration
     if device.type == "cuda":
         gpu_name = torch.cuda.get_device_name(0)
         gpu_cap = torch.cuda.get_device_capability(0)
         print(f"\n[Step 4] Initializing MultimodalHARModel on device: {device} ({gpu_name}, Compute Capability {gpu_cap[0]}.{gpu_cap[1]})")
         print(f"  - CUDA Device Count    : {torch.cuda.device_count()}")
         print(f"  - Initial Allocated Mem: {torch.cuda.memory_allocated(0) / (1024**2):.2f} MB")
+        if args.cudnn_benchmark:
+            torch.backends.cudnn.benchmark = True
+            print("  - cuDNN Benchmark Tuner: ENABLED")
     else:
         print(f"\n[Step 4] Initializing MultimodalHARModel on device: {device} (CUDA not available, running on CPU)")
+
+    # Mixed precision scaler setup
+    use_amp = (device.type == "cuda") and (not args.no_amp)
+    scaler = None
+    if use_amp:
+        try:
+            scaler = torch.amp.GradScaler("cuda")
+        except Exception:
+            scaler = torch.cuda.amp.GradScaler()
+        print("  - Automatic Mixed Precision (AMP): ENABLED (float16)")
+    else:
+        print("  - Automatic Mixed Precision (AMP): DISABLED (FP32)")
 
     freeze_video = args.freeze_video or args.staged_finetune
     if args.staged_finetune:
@@ -254,10 +330,49 @@ def main():
     )
     scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=args.epochs, eta_min=1e-6)
 
+    # Optional calibration warm-up check to guarantee memory safety before full run
+    if args.benchmark_warmup and len(train_loader) > 0:
+        print("\n[Calibration] Running 1-batch memory-safety warm-up check...")
+        try:
+            model.train()
+            for v_w, s_w, l_w, _ in train_loader:
+                v_w = v_w.to(device, non_blocking=True)
+                s_w = s_w.to(device, non_blocking=True)
+                l_w = l_w.to(device, non_blocking=True)
+                optimizer.zero_grad(set_to_none=True)
+                if use_amp and scaler:
+                    with torch.amp.autocast(device_type="cuda", dtype=torch.float16):
+                        log_w = model(video=v_w, sensor=s_w, override_mode=args.mode)
+                        loss_w = criterion(log_w, l_w)
+                    scaler.scale(loss_w).backward()
+                else:
+                    log_w = model(video=v_w, sensor=s_w, override_mode=args.mode)
+                    loss_w = criterion(log_w, l_w)
+                    loss_w.backward()
+                optimizer.zero_grad(set_to_none=True)
+                break
+            print("  --> Memory-safety calibration passed cleanly.")
+        except (torch.cuda.OutOfMemoryError, RuntimeError) as e:
+            if "out of memory" in str(e).lower():
+                torch.cuda.empty_cache()
+                raise RuntimeError(
+                    f"CUDA OutOfMemory during calibration warm-up with batch_size={args.batch_size}.\n"
+                    f"Please reduce --batch_size (e.g. --batch_size {max(1, args.batch_size // 2)})."
+                ) from e
+            raise e
+
     # 5. Training Loop
     start_epoch = 1
     best_val_f1 = -1.0
-    history = {"train_loss": [], "val_loss": [], "train_acc": [], "val_acc": []}
+    history = {
+        "train_loss": [],
+        "val_loss": [],
+        "train_acc": [],
+        "val_acc": [],
+        "train_time_sec": [],
+        "val_time_sec": [],
+        "peak_gpu_mem_mb": [],
+    }
     patience_counter = 0
 
     if args.resume and Path(args.resume).exists():
@@ -295,23 +410,33 @@ def main():
                 scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=max(1, args.epochs - epoch + 1), eta_min=1e-6)
                 print(f"    Backbone unfrozen ({sum(p.numel() for p in backbone_params):,} params @ lr={args.unfreeze_lr}), Heads @ lr={args.lr}")
 
-        epoch_start = time.time()
-        train_loss, train_acc = train_one_epoch(model, train_loader, criterion, optimizer, device, args.mode)
-        val_metrics, val_labels, val_probs = evaluate(model, val_loader, criterion, device, args.mode, VERIFIED_TARGET_CLASSES)
+        t0 = time.time()
+        train_loss, train_acc = train_one_epoch(model, train_loader, criterion, optimizer, device, args.mode, scaler=scaler, use_amp=use_amp)
+        train_dur = time.time() - t0
+
+        t1 = time.time()
+        val_metrics, val_labels, val_probs = evaluate(model, val_loader, criterion, device, args.mode, VERIFIED_TARGET_CLASSES, use_amp=use_amp)
+        val_dur = time.time() - t1
         scheduler.step()
 
         val_loss = val_metrics["loss"]
         val_acc = val_metrics["accuracy"] * 100.0
         val_f1 = val_metrics["macro_f1"]
-        epoch_dur = time.time() - epoch_start
+        epoch_dur = train_dur + val_dur
+
+        peak_mem = round(torch.cuda.max_memory_allocated(0) / (1024**2), 1) if device.type == "cuda" else 0.0
 
         history["train_loss"].append(train_loss)
         history["val_loss"].append(val_loss)
         history["train_acc"].append(train_acc)
         history["val_acc"].append(val_acc)
+        history["train_time_sec"].append(round(train_dur, 2))
+        history["val_time_sec"].append(round(val_dur, 2))
+        history["peak_gpu_mem_mb"].append(peak_mem)
 
+        mem_info = f", Peak GPU: {peak_mem}MB" if device.type == "cuda" else ""
         print(
-            f"Epoch {epoch:03d}/{args.epochs:03d} [{epoch_dur:.1f}s] - "
+            f"Epoch {epoch:03d}/{args.epochs:03d} [{epoch_dur:.1f}s (train: {train_dur:.1f}s, val: {val_dur:.1f}s){mem_info}] - "
             f"Train Loss: {train_loss:.4f}, Train Acc: {train_acc:.2f}% | "
             f"Val Loss: {val_loss:.4f}, Val Acc: {val_acc:.2f}%, Val Macro F1: {val_f1:.4f}"
         )
@@ -478,11 +603,11 @@ def main():
             split_name=f"Val ({args.split_strategy})",
         )
 
-    # 7. Save history and summary JSON + CSV
+    # 7. Save history, experiment manifest, and runtime report
     csv_path = output_dir / f"history_{args.video_backbone}.csv"
     with open(csv_path, "w", newline="") as f:
         writer = csv.writer(f)
-        writer.writerow(["epoch", "train_loss", "val_loss", "train_acc", "val_acc"])
+        writer.writerow(["epoch", "train_loss", "val_loss", "train_acc", "val_acc", "train_time_sec", "val_time_sec", "peak_gpu_mem_mb"])
         for i in range(len(history["train_loss"])):
             writer.writerow([
                 i + 1,
@@ -490,7 +615,11 @@ def main():
                 round(history["val_loss"][i], 4),
                 round(history["train_acc"][i], 2),
                 round(history["val_acc"][i], 2),
+                history["train_time_sec"][i] if i < len(history["train_time_sec"]) else 0.0,
+                history["val_time_sec"][i] if i < len(history["val_time_sec"]) else 0.0,
+                history["peak_gpu_mem_mb"][i] if i < len(history["peak_gpu_mem_mb"]) else 0.0,
             ])
+
     summary = {
         "dataset_root": str(data_path),
         "is_synthetic": is_synthetic,
@@ -510,7 +639,72 @@ def main():
         json.dump(summary, f, indent=2)
     with open(output_dir / f"history_{args.video_backbone}.json", "w") as f:
         json.dump(history, f, indent=2)
-    print(f"  - Saved training summaries to: {output_dir / f'training_summary_{args.video_backbone}.json'}")
+
+    # Experiment Manifest
+    manifest = {
+        "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+        "commit_hash": get_git_commit_hash(),
+        "model_name": args.video_backbone,
+        "mode": args.mode,
+        "video_backbone": args.video_backbone,
+        "sensor_backbone": args.sensor_backbone,
+        "split_strategy": args.split_strategy,
+        "epochs": args.epochs,
+        "min_epochs": args.min_epochs,
+        "batch_size": args.batch_size,
+        "lr": args.lr,
+        "weight_decay": args.weight_decay,
+        "dropout": args.dropout,
+        "device": str(device),
+        "gpu_name": torch.cuda.get_device_name(0) if device.type == "cuda" else "N/A",
+        "amp_enabled": use_amp,
+        "num_workers": args.num_workers,
+        "pin_memory": pin_mem,
+        "cudnn_benchmark": args.cudnn_benchmark,
+        "target_classes": VERIFIED_TARGET_CLASSES,
+        "train_samples_count": len(train_samples),
+        "val_samples_count": len(val_samples),
+        "test_samples_count": len(test_samples),
+        "package_versions": {
+            "torch": torch.__version__,
+            "numpy": np.__version__,
+            "scipy": getattr(sys.modules.get("scipy"), "__version__", "unknown"),
+        },
+    }
+    with open(output_dir / f"experiment_manifest_{args.video_backbone}.json", "w") as f:
+        json.dump(manifest, f, indent=2)
+    with open(output_dir / "experiment_manifest.json", "w") as f:
+        json.dump(manifest, f, indent=2)
+
+    # Runtime report
+    peak_mem_val = max(history["peak_gpu_mem_mb"], default=0.0)
+    runtime_report = {
+        "model": args.video_backbone,
+        "mode": args.mode,
+        "epochs_requested": args.epochs,
+        "epochs_completed": len(history["train_loss"]),
+        "total_runtime_seconds": round(total_training_time, 2),
+        "avg_epoch_duration_seconds": round(total_training_time / max(1, len(history["train_loss"])), 2),
+        "peak_gpu_memory_mb": peak_mem_val,
+        "best_val_f1": round(best_val_f1, 4),
+    }
+    with open(output_dir / f"runtime_report_{args.video_backbone}.json", "w") as f:
+        json.dump(runtime_report, f, indent=2)
+    with open(output_dir / "runtime_report.json", "w") as f:
+        json.dump(runtime_report, f, indent=2)
+
+    with open(output_dir / f"runtime_report_{args.video_backbone}.csv", "w", newline="") as f:
+        writer = csv.writer(f)
+        writer.writerow(["metric", "value"])
+        for k, v in runtime_report.items():
+            writer.writerow([k, v])
+    with open(output_dir / "runtime_report.csv", "w", newline="") as f:
+        writer = csv.writer(f)
+        writer.writerow(["metric", "value"])
+        for k, v in runtime_report.items():
+            writer.writerow([k, v])
+
+    print(f"  - Saved training summaries and manifests to: {output_dir}")
 
 
 if __name__ == "__main__":

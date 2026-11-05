@@ -44,6 +44,7 @@ def parse_args():
     parser.add_argument("--checkpoint", type=str, default="outputs/checkpoints/best_model.pth", help="Checkpoint path")
     parser.add_argument("--data_root", type=str, default=None, help="Dataset root (if None, read from checkpoint)")
     parser.add_argument("--batch_size", type=int, default=8, help="Batch size")
+    parser.add_argument("--cache_dir", type=str, default=None, help="Cache directory for preprocessed tensors")
     parser.add_argument("--output_file", type=str, default="outputs/metrics.json", help="Path to save evaluation metrics")
     parser.add_argument("--plots_dir", type=str, default="outputs/plots", help="Directory for evaluation plots")
     parser.add_argument("--smoke_test", action="store_true", help="Force evaluate on synthetic data split")
@@ -51,18 +52,23 @@ def parse_args():
 
 
 @torch.no_grad()
-def run_evaluation_for_mode(model, loader, device, mode, class_names):
+def run_evaluation_for_mode(model, loader, device, mode, class_names, use_amp=False):
     model.eval()
     all_preds = []
     all_labels = []
     all_probs = []
 
     for video, sensor, label, _ in loader:
-        video = video.to(device)
-        sensor = sensor.to(device)
-        label = label.to(device)
+        video = video.to(device, non_blocking=True)
+        sensor = sensor.to(device, non_blocking=True)
+        label = label.to(device, non_blocking=True)
 
-        logits = model(video=video, sensor=sensor, override_mode=mode)
+        if use_amp and device.type == "cuda":
+            with torch.amp.autocast(device_type="cuda", dtype=torch.float16):
+                logits = model(video=video, sensor=sensor, override_mode=mode)
+        else:
+            logits = model(video=video, sensor=sensor, override_mode=mode)
+
         probs = torch.softmax(logits, dim=-1)
 
         all_preds.extend(logits.argmax(dim=-1).cpu().numpy())
@@ -131,16 +137,11 @@ def main():
     print(f"Evaluating on held-out {eval_split_name} split ({len(eval_samples)} samples)...")
 
     # DataLoader
-    eval_ds = MMActMultimodalDataset(eval_samples, enable_cache=False)
-    eval_loader = DataLoader(eval_ds, batch_size=args.batch_size, shuffle=False, num_workers=0)
+    c_eval = (Path(args.cache_dir) / eval_split_name) if args.cache_dir else None
+    eval_ds = MMActMultimodalDataset(eval_samples, cache_dir=c_eval, enable_cache=(c_eval is not None))
+    eval_loader = DataLoader(eval_ds, batch_size=args.batch_size, shuffle=False, num_workers=0, pin_memory=(device.type == "cuda"))
 
     # Initialize model and load weights
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    if device.type == "cuda":
-        gpu_name = torch.cuda.get_device_name(0)
-        print(f"Using evaluation device: {device} ({gpu_name})")
-    else:
-        print(f"Using evaluation device: {device} (CPU)")
     model = MultimodalHARModel(
         num_classes=len(classes),
         video_channels=3,
@@ -155,15 +156,17 @@ def main():
     model.load_state_dict(checkpoint["model_state_dict"])
     model.to(device)
 
+    use_amp = (device.type == "cuda")
+
     # Run evaluations
     print("\n[1/3] Evaluating Multimodal Fusion Model...")
-    mm_metrics, y_true, mm_probs = run_evaluation_for_mode(model, eval_loader, device, "multimodal", classes)
+    mm_metrics, y_true, mm_probs = run_evaluation_for_mode(model, eval_loader, device, "multimodal", classes, use_amp=use_amp)
 
     print("[2/3] Evaluating Video-Only Baseline...")
-    vo_metrics, _, vo_probs = run_evaluation_for_mode(model, eval_loader, device, "video_only", classes)
+    vo_metrics, _, vo_probs = run_evaluation_for_mode(model, eval_loader, device, "video_only", classes, use_amp=use_amp)
 
     print("[3/3] Evaluating Sensor-Only Baseline...")
-    so_metrics, _, so_probs = run_evaluation_for_mode(model, eval_loader, device, "sensor_only", classes)
+    so_metrics, _, so_probs = run_evaluation_for_mode(model, eval_loader, device, "sensor_only", classes, use_amp=use_amp)
 
     # Display comparison table
     print("\n" + "=" * 80)

@@ -49,6 +49,10 @@ def parse_args():
     parser.add_argument("--split_strategy", type=str, default="subject", choices=["subject", "cross_view", "cross_scene", "session"])
     parser.add_argument("--epochs_per_trial", type=int, default=10, help="Epochs per tuning trial")
     parser.add_argument("--batch_size", type=int, default=8, help="Batch size")
+    parser.add_argument("--num_workers", type=int, default=0, help="DataLoader workers")
+    parser.add_argument("--no_amp", action="store_true", help="Disable AMP during tuning")
+    parser.add_argument("--pin_memory", action="store_true", default=True, help="Enable DataLoader pin_memory")
+    parser.add_argument("--cache_dir", type=str, default=None, help="Cache directory for preprocessed tensors")
     parser.add_argument("--output_dir", type=str, default="outputs/tuning", help="Tuning output directory")
     parser.add_argument("--plots_dir", type=str, default="outputs/plots", help="Plots directory")
     parser.add_argument("--seed", type=int, default=42, help="Random seed")
@@ -56,34 +60,56 @@ def parse_args():
     return parser.parse_args()
 
 
-def train_epoch(model, loader, criterion, optimizer, device):
+def train_epoch(model, loader, criterion, optimizer, device, scaler=None, use_amp=False):
     model.train()
     total_loss, correct, total = 0.0, 0, 0
     for video, sensor, label, _ in loader:
-        video, sensor, label = video.to(device), sensor.to(device), label.to(device)
-        optimizer.zero_grad()
-        logits = model(video=video, sensor=sensor, override_mode="video_only")
-        loss = criterion(logits, label)
-        loss.backward()
-        optimizer.step()
+        video = video.to(device, non_blocking=True)
+        sensor = sensor.to(device, non_blocking=True)
+        label = label.to(device, non_blocking=True)
 
-        total_loss += loss.item() * len(label)
-        preds = logits.argmax(dim=-1)
+        optimizer.zero_grad(set_to_none=True)
+
+        if use_amp and device.type == "cuda" and scaler is not None:
+            with torch.amp.autocast(device_type="cuda", dtype=torch.float16):
+                logits = model(video=video, sensor=sensor, override_mode="video_only")
+                loss = criterion(logits, label)
+            scaler.scale(loss).backward()
+            scaler.step(optimizer)
+            scaler.update()
+        else:
+            logits = model(video=video, sensor=sensor, override_mode="video_only")
+            loss = criterion(logits, label)
+            loss.backward()
+            optimizer.step()
+
+        batch_sz = len(label)
+        total_loss += loss.detach().item() * batch_sz
+        preds = logits.detach().argmax(dim=-1)
         correct += (preds == label).sum().item()
-        total += len(label)
+        total += batch_sz
     return total_loss / total if total > 0 else 0.0, (correct / total * 100.0) if total > 0 else 0.0
 
 
 @torch.no_grad()
-def evaluate_epoch(model, loader, criterion, device, class_names):
+def evaluate_epoch(model, loader, criterion, device, class_names, use_amp=False):
     model.eval()
     total_loss = 0.0
     all_preds, all_labels = [], []
     for video, sensor, label, _ in loader:
-        video, sensor, label = video.to(device), sensor.to(device), label.to(device)
-        logits = model(video=video, sensor=sensor, override_mode="video_only")
-        loss = criterion(logits, label)
-        total_loss += loss.item() * len(label)
+        video = video.to(device, non_blocking=True)
+        sensor = sensor.to(device, non_blocking=True)
+        label = label.to(device, non_blocking=True)
+
+        if use_amp and device.type == "cuda":
+            with torch.amp.autocast(device_type="cuda", dtype=torch.float16):
+                logits = model(video=video, sensor=sensor, override_mode="video_only")
+                loss = criterion(logits, label)
+        else:
+            logits = model(video=video, sensor=sensor, override_mode="video_only")
+            loss = criterion(logits, label)
+
+        total_loss += loss.detach().item() * len(label)
         all_preds.extend(logits.argmax(dim=-1).cpu().numpy())
         all_labels.extend(label.cpu().numpy())
 
@@ -134,13 +160,27 @@ def main():
     for check_name, passed in isolation.items():
         assert passed, f"CRITICAL: Leakage detected across splits ({check_name})!"
 
-    train_ds = MMActMultimodalDataset(train_samples, enable_cache=True)
-    val_ds = MMActMultimodalDataset(val_samples, enable_cache=True)
-    train_loader = DataLoader(train_ds, batch_size=args.batch_size, shuffle=True, num_workers=0)
-    val_loader = DataLoader(val_ds, batch_size=args.batch_size, shuffle=False, num_workers=0)
-
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    pin_mem = (device.type == "cuda") and args.pin_memory
+    persistent = (args.num_workers > 0)
+
+    c_train = (Path(args.cache_dir) / "train") if args.cache_dir else None
+    c_val = (Path(args.cache_dir) / "val") if args.cache_dir else None
+
+    train_ds = MMActMultimodalDataset(train_samples, cache_dir=c_train, enable_cache=True)
+    val_ds = MMActMultimodalDataset(val_samples, cache_dir=c_val, enable_cache=True)
+    train_loader = DataLoader(train_ds, batch_size=args.batch_size, shuffle=True, num_workers=args.num_workers, pin_memory=pin_mem, persistent_workers=persistent)
+    val_loader = DataLoader(val_ds, batch_size=args.batch_size, shuffle=False, num_workers=args.num_workers, pin_memory=pin_mem, persistent_workers=persistent)
+
     criterion = nn.CrossEntropyLoss()
+    use_amp = (device.type == "cuda") and (not args.no_amp)
+    scaler = None
+    if use_amp:
+        try:
+            scaler = torch.amp.GradScaler("cuda")
+        except Exception:
+            scaler = torch.cuda.amp.GradScaler()
+        print("  - Tuning AMP Acceleration: ENABLED (float16)")
 
     trials_history = []
     best_trial = None
@@ -179,8 +219,8 @@ def main():
         trial_epoch_history = []
 
         for ep in range(1, args.epochs_per_trial + 1):
-            t_loss, t_acc = train_epoch(model, train_loader, criterion, optimizer, device)
-            v_metrics = evaluate_epoch(model, val_loader, criterion, device, VERIFIED_TARGET_CLASSES)
+            t_loss, t_acc = train_epoch(model, train_loader, criterion, optimizer, device, scaler=scaler, use_amp=use_amp)
+            v_metrics = evaluate_epoch(model, val_loader, criterion, device, VERIFIED_TARGET_CLASSES, use_amp=use_amp)
             scheduler.step()
 
             v_acc = v_metrics["accuracy"] * 100.0
