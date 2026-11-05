@@ -52,11 +52,25 @@ def compute_classification_metrics(
 
     cm = confusion_matrix(y_true, y_pred, labels=list(range(num_classes)))
 
+    # Per-class metrics
+    per_class_prec = precision_score(y_true, y_pred, average=None, labels=list(range(num_classes)), zero_division=0)
+    per_class_rec = recall_score(y_true, y_pred, average=None, labels=list(range(num_classes)), zero_division=0)
+    per_class_f1 = f1_score(y_true, y_pred, average=None, labels=list(range(num_classes)), zero_division=0)
+
+    per_class_dict = {}
+    for i, cls_name in enumerate(target_classes):
+        per_class_dict[cls_name] = {
+            "precision": float(per_class_prec[i]),
+            "recall": float(per_class_rec[i]),
+            "f1": float(per_class_f1[i]),
+        }
+
     metrics = {
         "accuracy": acc,
         "macro_f1": macro_f1,
         "macro_precision": macro_prec,
         "macro_recall": macro_rec,
+        "per_class": per_class_dict,
         "confusion_matrix": cm.tolist(),
         "total_samples": len(y_true),
     }

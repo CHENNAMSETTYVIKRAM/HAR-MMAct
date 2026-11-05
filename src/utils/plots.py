@@ -311,3 +311,82 @@ def plot_multiclass_pr(
     fig.tight_layout()
     plt.savefig(output_path, dpi=200, bbox_inches="tight")
     plt.close(fig)
+
+
+def plot_cnn_vs_mobilenet_comparison(
+    cnn_history: Dict[str, List[float]],
+    mobilenet_history: Dict[str, List[float]],
+    output_path: Union[str, Path],
+    split_strategy: str = "subject-independent",
+) -> None:
+    """
+    Renders direct accuracy trajectory comparison:
+    Custom CNN vs. MobileNetV2 over training and validation epochs.
+    """
+    output_path = Path(output_path)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+
+    fig, ax = plt.subplots(figsize=(9, 5))
+
+    epochs_cnn = list(range(1, len(cnn_history.get("val_acc", [])) + 1))
+    epochs_mob = list(range(1, len(mobilenet_history.get("val_acc", [])) + 1))
+
+    # CNN curves
+    if "train_acc" in cnn_history:
+        ax.plot(epochs_cnn, cnn_history["train_acc"], label="Custom CNN (Train Acc)", color="#2b6cb0", linestyle="--", lw=1.6)
+    if "val_acc" in cnn_history:
+        ax.plot(epochs_cnn, cnn_history["val_acc"], label="Custom CNN (Val Acc)", color="#2b6cb0", marker="o", markersize=4, lw=2.0)
+
+    # MobileNetV2 curves
+    if "train_acc" in mobilenet_history:
+        ax.plot(epochs_mob, mobilenet_history["train_acc"], label="MobileNetV2 (Train Acc)", color="#d69e2e", linestyle="--", lw=1.6)
+    if "val_acc" in mobilenet_history:
+        ax.plot(epochs_mob, mobilenet_history["val_acc"], label="MobileNetV2 (Val Acc)", color="#e53e3e", marker="s", markersize=4, lw=2.0)
+
+    ax.set_title(f"Model Comparison: Custom CNN vs MobileNetV2 Accuracy ({split_strategy.title()} Split)", fontsize=11, fontweight="bold")
+    ax.set_xlabel("Epoch", fontsize=10)
+    ax.set_ylabel("Accuracy (%)", fontsize=10)
+    ax.legend(loc="lower right", frameon=True)
+    ax.grid(True, color="#e2e8f0", linestyle="-", linewidth=0.8)
+
+    fig.tight_layout()
+    plt.savefig(output_path, dpi=200, bbox_inches="tight")
+    plt.close(fig)
+
+
+def plot_per_class_metrics(
+    per_class_dict: Dict[str, Dict[str, float]],
+    output_path: Union[str, Path],
+    model_name: str = "Model",
+    split_name: str = "Held-Out Test Split",
+) -> None:
+    """
+    Renders grouped bar chart of per-class Precision, Recall, and F1-score.
+    """
+    output_path = Path(output_path)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+
+    classes = list(per_class_dict.keys())
+    precisions = [per_class_dict[c].get("precision", 0.0) * 100.0 for c in classes]
+    recalls = [per_class_dict[c].get("recall", 0.0) * 100.0 for c in classes]
+    f1s = [per_class_dict[c].get("f1", 0.0) * 100.0 for c in classes]
+
+    x = np.arange(len(classes))
+    width = 0.25
+
+    fig, ax = plt.subplots(figsize=(12, 6))
+    ax.bar(x - width, precisions, width, label="Precision", color="#3182ce")
+    ax.bar(x, recalls, width, label="Recall", color="#38a169")
+    ax.bar(x + width, f1s, width, label="F1-Score", color="#dd6b20")
+
+    ax.set_ylabel("Score (%)", fontsize=10)
+    ax.set_title(f"Per-Class Metrics: {model_name} ({split_name})", fontsize=12, fontweight="bold")
+    ax.set_xticks(x)
+    ax.set_xticklabels(classes, rotation=35, ha="right", fontsize=9)
+    ax.set_ylim([0, 105])
+    ax.legend(loc="upper right")
+    ax.grid(axis="y", linestyle="--", alpha=0.6)
+
+    fig.tight_layout()
+    plt.savefig(output_path, dpi=200, bbox_inches="tight")
+    plt.close(fig)

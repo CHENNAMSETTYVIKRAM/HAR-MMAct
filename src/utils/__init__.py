@@ -11,6 +11,8 @@ from src.utils.plots import (
     plot_annotated_train_test_accuracy,
     plot_multiclass_roc,
     plot_multiclass_pr,
+    plot_cnn_vs_mobilenet_comparison,
+    plot_per_class_metrics,
 )
 
 __all__ = [
@@ -22,4 +24,6 @@ __all__ = [
     "plot_annotated_train_test_accuracy",
     "plot_multiclass_roc",
     "plot_multiclass_pr",
+    "plot_cnn_vs_mobilenet_comparison",
+    "plot_per_class_metrics",
 ]

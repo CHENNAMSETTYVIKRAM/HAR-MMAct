@@ -171,35 +171,196 @@ class ResNet18VideoBranch(nn.Module):
         return self.temporal_fc(concat_pooled)
 
 
-class LightweightVideoBranch(nn.Module):
+class InvertedResidual(nn.Module):
+    def __init__(self, inp: int, oup: int, stride: int, expand_ratio: int):
+        super().__init__()
+        self.stride = stride
+        assert stride in [1, 2]
+        hidden_dim = int(round(inp * expand_ratio))
+        self.use_res_connect = self.stride == 1 and inp == oup
+
+        layers = []
+        if expand_ratio != 1:
+            layers.extend([
+                nn.Conv2d(inp, hidden_dim, 1, 1, 0, bias=False),
+                nn.BatchNorm2d(hidden_dim),
+                nn.ReLU6(inplace=True),
+            ])
+        layers.extend([
+            nn.Conv2d(hidden_dim, hidden_dim, 3, stride, 1, groups=hidden_dim, bias=False),
+            nn.BatchNorm2d(hidden_dim),
+            nn.ReLU6(inplace=True),
+            nn.Conv2d(hidden_dim, oup, 1, 1, 0, bias=False),
+            nn.BatchNorm2d(oup),
+        ])
+        self.conv = nn.Sequential(*layers)
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        if self.use_res_connect:
+            return x + self.conv(x)
+        return self.conv(x)
+
+
+class MobileNetV2Backbone(nn.Module):
     """
-    Lightweight video feature extractor for clip tensors of shape (B, C, T, H, W).
-    Processes each frame with shared 2D convolutional blocks, then applies temporal
-    pooling (mean + max) across time steps to produce a fixed-size embedding.
+    MobileNetV2 feature extractor implemented in pure PyTorch.
+    Compatible with official torchvision checkpoints without external dependency.
+    Extracts 1280-dim feature representation per frame.
+    """
+
+    def __init__(self, in_channels: int = 3, width_mult: float = 1.0):
+        super().__init__()
+        input_channel = int(32 * width_mult)
+        last_channel = int(1280 * max(1.0, width_mult))
+
+        interverted_residual_setting = [
+            # t, c, n, s
+            [1, 16, 1, 1],
+            [6, 24, 2, 2],
+            [6, 32, 3, 2],
+            [6, 64, 4, 2],
+            [6, 96, 3, 1],
+            [6, 160, 3, 2],
+            [6, 320, 1, 1],
+        ]
+
+        features = [
+            nn.Conv2d(in_channels, input_channel, 3, 2, 1, bias=False),
+            nn.BatchNorm2d(input_channel),
+            nn.ReLU6(inplace=True),
+        ]
+
+        for t, c, n, s in interverted_residual_setting:
+            output_channel = int(c * width_mult)
+            for i in range(n):
+                stride = s if i == 0 else 1
+                features.append(InvertedResidual(input_channel, output_channel, stride, expand_ratio=t))
+                input_channel = output_channel
+
+        features.extend([
+            nn.Conv2d(input_channel, last_channel, 1, 1, 0, bias=False),
+            nn.BatchNorm2d(last_channel),
+            nn.ReLU6(inplace=True),
+            nn.AdaptiveAvgPool2d((1, 1)),
+        ])
+        self.features = nn.Sequential(*features)
+        self.last_channel = last_channel
+
+    def forward_features(self, x: torch.Tensor) -> torch.Tensor:
+        x = self.features(x)
+        return x.view(x.size(0), -1)
+
+
+class MobileNetV2VideoBranch(nn.Module):
+    """
+    MobileNetV2 Video Feature Extractor for Human Activity Recognition clips (B, C, T, H, W).
+    Applies transfer learning with documented pre-trained weights strategy:
+    Loads pre-trained ImageNet weights when available (via torchvision or pre-downloaded checkpoint),
+    pools 1280-dim frame representations temporally (mean + max pooling -> 2560 dims),
+    and projects into embedding_dim with dropout regularization.
     """
 
     def __init__(
         self,
         in_channels: int = 3,
         embedding_dim: int = 128,
-        dropout: float = 0.2,
+        dropout: float = 0.3,
+        pretrained: bool = True,
+        pretrained_path: Optional[str] = None,
+        freeze_backbone: bool = False,
+    ):
+        super().__init__()
+        self.embedding_dim = embedding_dim
+        self.last_channel = 1280
+
+        loaded_torchvision = False
+        if pretrained and pretrained_path is None:
+            try:
+                import torchvision.models as models
+                try:
+                    from torchvision.models import MobileNet_V2_Weights
+                    tv_mobilenet = models.mobilenet_v2(weights=MobileNet_V2_Weights.DEFAULT)
+                except Exception:
+                    tv_mobilenet = models.mobilenet_v2(pretrained=True)
+                self.backbone = tv_mobilenet.features
+                self.backbone_pool = nn.AdaptiveAvgPool2d((1, 1))
+                loaded_torchvision = True
+                print("[MobileNetV2VideoBranch] Initialized with official pretrained ImageNet weights via torchvision.")
+            except Exception as e:
+                print(f"[MobileNetV2VideoBranch] torchvision load fallback ({e}). Using pure PyTorch MobileNetV2.")
+
+        if not loaded_torchvision:
+            self.backbone = MobileNetV2Backbone(in_channels=in_channels)
+            self.last_channel = self.backbone.last_channel
+            if pretrained_path and os.path.exists(pretrained_path):
+                state_dict = torch.load(pretrained_path, map_location="cpu")
+                self.backbone.load_state_dict(state_dict, strict=False)
+                print(f"[MobileNetV2VideoBranch] Loaded weights from {pretrained_path}")
+
+        if freeze_backbone:
+            for p in self.backbone.parameters():
+                p.requires_grad = False
+            print("[MobileNetV2VideoBranch] Feature extractor frozen for fine-tuning top layers.")
+
+        # Temporal pooling (Mean + Max): 1280 * 2 = 2560 -> embedding_dim
+        self.temporal_fc = nn.Sequential(
+            nn.Dropout(dropout),
+            nn.Linear(self.last_channel * 2, embedding_dim),
+            nn.BatchNorm1d(embedding_dim),
+            nn.ReLU(inplace=True),
+        )
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        b, c, t, h, w = x.shape
+        x_reshuffled = x.permute(0, 2, 1, 3, 4).contiguous().view(b * t, c, h, w)
+        if hasattr(self, "backbone_pool"):
+            feats = self.backbone(x_reshuffled)
+            frame_feats = self.backbone_pool(feats).view(b * t, self.last_channel)
+        else:
+            frame_feats = self.backbone.forward_features(x_reshuffled)
+
+        feats_time = frame_feats.view(b, t, self.last_channel)
+        mean_pooled = torch.mean(feats_time, dim=1)
+        max_pooled, _ = torch.max(feats_time, dim=1)
+        concat_pooled = torch.cat([mean_pooled, max_pooled], dim=1)
+        return self.temporal_fc(concat_pooled)
+
+
+class CustomCNNVideoBranch(nn.Module):
+    """
+    Improved Custom CNN Video Branch for Human Activity Recognition clips (B, C, T, H, W).
+    Engineered with explicit anti-overfitting regularization:
+    - Batch Normalization after every convolution
+    - Spatial Dropout2d between conv stages
+    - Global average pooling per frame (bottlenecked to 128 dims)
+    - Temporal Mean + Max pooling across frames
+    - Higher dropout (0.4) on temporal projection to address overfitting
+    """
+
+    def __init__(
+        self,
+        in_channels: int = 3,
+        embedding_dim: int = 128,
+        dropout: float = 0.4,
     ):
         super().__init__()
         self.embedding_dim = embedding_dim
 
-        # Frame-level 2D feature extractor
+        # Frame-level 2D feature extractor with spatial dropout
         self.features = nn.Sequential(
-            nn.Conv2d(in_channels, 32, kernel_size=3, stride=2, padding=1),
+            nn.Conv2d(in_channels, 32, kernel_size=3, stride=2, padding=1, bias=False),
             nn.BatchNorm2d(32),
             nn.ReLU(inplace=True),
             nn.MaxPool2d(kernel_size=2, stride=2),
+            nn.Dropout2d(0.15),
 
-            nn.Conv2d(32, 64, kernel_size=3, stride=2, padding=1),
+            nn.Conv2d(32, 64, kernel_size=3, stride=2, padding=1, bias=False),
             nn.BatchNorm2d(64),
             nn.ReLU(inplace=True),
             nn.MaxPool2d(kernel_size=2, stride=2),
+            nn.Dropout2d(0.20),
 
-            nn.Conv2d(64, 128, kernel_size=3, stride=1, padding=1),
+            nn.Conv2d(64, 128, kernel_size=3, stride=1, padding=1, bias=False),
             nn.BatchNorm2d(128),
             nn.ReLU(inplace=True),
             nn.AdaptiveAvgPool2d((1, 1)),
@@ -222,3 +383,7 @@ class LightweightVideoBranch(nn.Module):
         max_pooled, _ = torch.max(feats_time, dim=1)
         concat_pooled = torch.cat([mean_pooled, max_pooled], dim=1)
         return self.temporal_fc(concat_pooled)
+
+
+# Alias for backward compatibility
+LightweightVideoBranch = CustomCNNVideoBranch

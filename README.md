@@ -214,32 +214,50 @@ Outputs:
 
 ---
 
-## 7. Kaggle Cloud GPU Execution
+## 7. Model Architectures & CNN vs. MobileNetV2 Benchmark
 
-For fast, accelerated training on genuine MMAct data, a ready-to-run Jupyter notebook is provided at [`notebooks/kaggle_mmact_har.ipynb`](notebooks/kaggle_mmact_har.ipynb).
+To address the student's previously reported overfitting discrepancy (97% training accuracy vs. 57% held-out test accuracy), our architecture pipeline introduces two complementary video encoders evaluated on identical multimodal splits:
 
-### Kaggle Setup:
-1. **Create a Kaggle Notebook:** Upload `notebooks/kaggle_mmact_har.ipynb` to Kaggle.
-2. **Attach Dataset:** Click **+ Add Input** in the top right to attach your uploaded MMAct dataset (supports either pre-extracted `data/genuine_mmact` or the raw ZIP archives: `trimmed_sensor.zip`, `trimmed_splits.zip`, `trimmed_x-scene_subject16.zip`, `trimmed_x-scene_subject8.zip`).
-3. **Configure Settings:**
-   - **Accelerator:** `GPU T4 x2` or `GPU P100` (Settings sidebar -> Accelerator)
-   - **Internet:** `On` (Settings sidebar -> Internet)
-4. **Run All Cells:**
-   - Step 1 verifies CUDA GPU detection and memory.
-   - Step 2 clones `https://github.com/CHENNAMSETTYVIKRAM/HAR-MMAct.git` and installs requirements.
-   - Step 3 locates and links the dataset from `/kaggle/input/`.
-   - Step 4 runs the exact 3-epoch benchmark on genuine MMAct data:
-     ```bash
-     python scripts/train.py --data_root data/genuine_mmact --epochs 3 --batch_size 8 --split_strategy subject
-     ```
-   - Step 5 performs standalone multimodal vs. unimodal test evaluations.
-   - Step 6 displays all loss, accuracy, confusion matrix, ROC, and PR plots inline.
-   - Step 7 tests single-sample multimodal inference.
-   - Step 8 packages all artifacts into `/kaggle/working/mmact_benchmark_results.zip` for instant one-click download.
+### A. Improved Custom CNN (Anti-Overfitting Regularization)
+- **Architecture**: 3-stage hierarchical 2D convolutional blocks with Spatial Dropout (`Dropout2d(0.15–0.20)`), Batch Normalization after every convolution, and Global Average Pooling per frame.
+- **Regularization**: High dropout ($p=0.40$), $L_2$ weight decay ($1\times 10^{-3}$), and early stopping patience.
+- **Temporal Aggregation**: Concatenated temporal Mean + Max pooling across frame representations ($128 \times 2 = 256$ dims) projected to a 128-dim video embedding.
+
+### B. MobileNetV2 (Transfer Learning & Fine-Tuning)
+- **Architecture**: Inverted residual blocks with linear bottlenecks (`torchvision` ImageNet pretrained backbone with pure PyTorch fallback for zero-dependency execution).
+- **Transfer Strategy**: Generalizes feature extraction on spatial frames using pretrained ImageNet weights, avoiding overfitting on limited subject data.
+- **Temporal Aggregation**: 1280-dim frame representations pooled temporally (Mean + Max $\rightarrow 2560$ dims) and projected through regularized linear layers to a 128-dim video embedding.
+
+### C. Multimodal Fusion
+Both encoders feed into the shared multimodal fusion head, concatenated with the 128-dim **InceptionTime** multi-scale 1D convolutional sensor feature extractor ($128 + 128 = 256$ dims) $\rightarrow$ Dropout ($0.30$) $\rightarrow$ Linear ($128$) $\rightarrow$ BatchNorm1d $\rightarrow$ ReLU $\rightarrow$ Dropout ($0.30$) $\rightarrow$ Linear ($10$ classes).
 
 ---
 
-## 8. Known Limitations & Integrity Commitments
+## 8. Kaggle Cloud GPU Execution
+
+A ready-to-run, self-contained Jupyter notebook is provided at [`notebooks/kaggle_mmact_har.ipynb`](notebooks/kaggle_mmact_har.ipynb).
+
+### Kaggle Setup:
+1. **Upload Notebook:** Upload `notebooks/kaggle_mmact_har.ipynb` to Kaggle.
+2. **Attach Dataset:** Click **+ Add Input** in the top right to attach your uploaded MMAct dataset (`mmact-trimmed`). Supports extracted directory structures or nested ZIP archives.
+3. **Configure Settings:**
+   - **Accelerator:** `GPU T4 x2` or `GPU P100` (Settings sidebar -> Accelerator)
+   - **Internet:** `On` (Settings sidebar -> Internet)
+4. **Execution Flow:**
+   - **Step 1**: Verifies CUDA GPU environment (`nvidia-smi`, compute capability).
+   - **Step 2**: Clones/updates `HAR-MMAct` into `/kaggle/working/HAR-MMAct`, configures `sys.path.insert(0, str(PROJECT_ROOT))`, and installs dependencies with `--prefer-binary`.
+   - **Step 3**: Deeply inspects `/kaggle/input`, discovers extracted or nested ZIP files, and sets up `data/genuine_mmact/trimmed/`.
+   - **Step 4**: Pre-flight validation verifying video, sensor, split isolation, and 10-class coverage.
+   - **Step 5**: Trains Model A (**Improved Custom CNN**) for 50 epochs (or configurable count).
+   - **Step 6**: Trains Model B (**MobileNetV2 Transfer Learning**) for 50 epochs.
+   - **Step 7**: Evaluates both models on the held-out subject-independent test split, generating comparison tables.
+   - **Step 8**: Renders all plots inline (loss curves, accuracy curves, confusion matrices, ROC/PR curves, per-class metrics, and the CNN vs. MobileNetV2 accuracy comparison).
+   - **Step 9**: Interactive multimodal inference demo.
+   - **Step 10**: Packages all outputs into `/kaggle/working/mmact_benchmark_results.zip` for instant one-click download.
+
+---
+
+## 9. Known Limitations & Integrity Commitments
 
 1. **Dataset Availability:**
    - The workspace contains `test_set_cross-view_1.zip` (14.99 GB, 13,869 unlabelled `.mp4` video files with obfuscated names for the CodaLab challenge leaderboard).

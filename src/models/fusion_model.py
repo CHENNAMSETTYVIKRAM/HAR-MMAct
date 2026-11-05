@@ -7,14 +7,19 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from src.models.video_branch import ResNet18VideoBranch, LightweightVideoBranch
+from src.models.video_branch import (
+    ResNet18VideoBranch,
+    LightweightVideoBranch,
+    CustomCNNVideoBranch,
+    MobileNetV2VideoBranch,
+)
 from src.models.sensor_branch import InceptionTimeSensorBranch, Sensor1DCNNBranch
 
 
 class MultimodalHARModel(nn.Module):
     """
     Multimodal Human Activity Recognition model fusing video and sensor streams.
-    Supports pretrained ResNet-18 or Lightweight CNN for video, and InceptionTime
+    Supports pretrained ResNet-18, MobileNetV2, or Custom CNN for video, and InceptionTime
     or 1D-CNN for sensor time series. Also natively supports unimodal evaluation modes.
     """
 
@@ -28,7 +33,7 @@ class MultimodalHARModel(nn.Module):
         fusion_hidden_dim: int = 128,
         dropout: float = 0.3,
         mode: str = "multimodal",  # 'multimodal', 'video_only', 'sensor_only'
-        video_backbone: str = "resnet18",  # 'resnet18' or 'lightweight'
+        video_backbone: str = "resnet18",  # 'resnet18', 'mobilenet_v2', 'cnn', 'custom_cnn'
         sensor_backbone: str = "inception_time",  # 'inception_time' or 'cnn1d'
         pretrained_video: bool = True,
         pretrained_path: str = "outputs/pretrained/resnet18.pth",
@@ -41,7 +46,16 @@ class MultimodalHARModel(nn.Module):
         self.sensor_backbone_name = sensor_backbone
 
         # Video branch initialization
-        if video_backbone == "resnet18":
+        if video_backbone in ["mobilenet_v2", "mobilenet"]:
+            self.video_branch = MobileNetV2VideoBranch(
+                in_channels=video_channels,
+                embedding_dim=video_embed_dim,
+                dropout=dropout,
+                pretrained=pretrained_video,
+                pretrained_path=pretrained_path if ("mobilenet" in pretrained_path.lower()) else None,
+                freeze_backbone=freeze_video_backbone,
+            )
+        elif video_backbone == "resnet18":
             self.video_branch = ResNet18VideoBranch(
                 in_channels=video_channels,
                 embedding_dim=video_embed_dim,
@@ -50,11 +64,11 @@ class MultimodalHARModel(nn.Module):
                 pretrained_path=pretrained_path,
                 freeze_backbone=freeze_video_backbone,
             )
-        else:
-            self.video_branch = LightweightVideoBranch(
+        else:  # 'cnn', 'custom_cnn', 'lightweight'
+            self.video_branch = CustomCNNVideoBranch(
                 in_channels=video_channels,
                 embedding_dim=video_embed_dim,
-                dropout=dropout,
+                dropout=max(0.35, dropout),
             )
 
         # Sensor branch initialization

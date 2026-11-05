@@ -32,6 +32,7 @@ from src.utils.plots import (
     plot_confusion_matrix,
     plot_multiclass_roc,
     plot_multiclass_pr,
+    plot_per_class_metrics,
 )
 
 
@@ -192,21 +193,30 @@ def main():
     # Generate plots
     plots_dir = Path(args.plots_dir)
     plots_dir.mkdir(parents=True, exist_ok=True)
+    video_bb = saved_cfg.get("video_backbone", "model")
+
     if "confusion_matrix" in mm_metrics:
         cm_array = np.array(mm_metrics["confusion_matrix"])
-        plot_confusion_matrix(
-            cm_array,
-            classes,
-            plots_dir / "test_confusion_matrix.png",
-            title=f"Test Confusion Matrix ({'SYNTHETIC' if is_synthetic else 'GENUINE'})",
-        )
+        title = f"Test Confusion Matrix - {video_bb.upper()} ({split_strategy} split)"
+        plot_confusion_matrix(cm_array, classes, plots_dir / "test_confusion_matrix.png", title=title)
+        plot_confusion_matrix(cm_array, classes, plots_dir / f"test_confusion_matrix_{video_bb}.png", title=title)
         print(f"Saved confusion matrix plot to: {plots_dir / 'test_confusion_matrix.png'}")
 
     if y_true is not None and mm_probs is not None:
         plot_multiclass_roc(y_true, mm_probs, classes, plots_dir / "test_roc_ovr.png")
         plot_multiclass_pr(y_true, mm_probs, classes, plots_dir / "test_pr_curves.png")
-        print(f"Saved ROC curves to: {plots_dir / 'test_roc_ovr.png'}")
-        print(f"Saved PR curves to: {plots_dir / 'test_pr_curves.png'}")
+        plot_multiclass_roc(y_true, mm_probs, classes, plots_dir / f"test_roc_ovr_{video_bb}.png")
+        plot_multiclass_pr(y_true, mm_probs, classes, plots_dir / f"test_pr_curves_{video_bb}.png")
+        print(f"Saved ROC/PR curves to: {plots_dir / 'test_roc_ovr.png'}")
+
+    if "per_class" in mm_metrics:
+        plot_per_class_metrics(
+            mm_metrics["per_class"],
+            plots_dir / f"test_per_class_{video_bb}.png",
+            model_name=video_bb.upper(),
+            split_name=f"Test ({split_strategy} split)",
+        )
+        print(f"Saved per-class metrics plot to: {plots_dir / f'test_per_class_{video_bb}.png'}")
 
 
 if __name__ == "__main__":

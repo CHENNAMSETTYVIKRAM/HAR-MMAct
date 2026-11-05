@@ -19,6 +19,24 @@ def test_lightweight_video_branch_forward():
     assert not torch.isnan(out).any()
 
 
+def test_mobilenet_v2_video_branch_forward():
+    from src.models.video_branch import MobileNetV2VideoBranch
+    branch = MobileNetV2VideoBranch(in_channels=3, embedding_dim=128, pretrained=False)
+    dummy_video = torch.randn(2, 3, 4, 64, 64)
+    out = branch(dummy_video)
+    assert out.shape == (2, 128)
+    assert not torch.isnan(out).any()
+
+
+def test_custom_cnn_video_branch_forward():
+    from src.models.video_branch import CustomCNNVideoBranch
+    branch = CustomCNNVideoBranch(in_channels=3, embedding_dim=128, dropout=0.4)
+    dummy_video = torch.randn(2, 3, 4, 64, 64)
+    out = branch(dummy_video)
+    assert out.shape == (2, 128)
+    assert not torch.isnan(out).any()
+
+
 def test_resnet18_video_branch_forward():
     pretrained_exists = os.path.exists("outputs/pretrained/resnet18.pth")
     branch = ResNet18VideoBranch(

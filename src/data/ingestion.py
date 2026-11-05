@@ -55,12 +55,16 @@ class DatasetIngestionPipeline:
     def __init__(
         self,
         incoming_dir: Path,
-        raw_storage_dir: Path,
+        raw_storage_dir: Optional[Path] = None,
         manifest_path: Path = Path("outputs/ingestion_manifest.json"),
         quarantine_dir: Optional[Path] = None,
+        extracted_dir: Optional[Path] = None,
     ):
         self.incoming_dir = Path(incoming_dir)
-        self.raw_storage_dir = Path(raw_storage_dir)
+        target_dir = raw_storage_dir if raw_storage_dir is not None else extracted_dir
+        if target_dir is None:
+            raise ValueError("Either 'raw_storage_dir' or 'extracted_dir' must be provided.")
+        self.raw_storage_dir = Path(target_dir)
         self.manifest_path = Path(manifest_path)
         self.quarantine_dir = Path(quarantine_dir) if quarantine_dir else (self.raw_storage_dir / "quarantine")
         self.manifest: Dict[str, dict] = self._load_manifest()

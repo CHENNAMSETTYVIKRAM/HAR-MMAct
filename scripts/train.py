@@ -37,6 +37,7 @@ from src.utils.plots import (
     plot_confusion_matrix,
     plot_multiclass_roc,
     plot_multiclass_pr,
+    plot_per_class_metrics,
 )
 
 
@@ -49,9 +50,12 @@ def parse_args():
     parser.add_argument("--weight_decay", type=float, default=1e-4, help="Weight decay")
     parser.add_argument("--split_strategy", type=str, default="subject", choices=["subject", "cross_view", "cross_scene", "session"], help="Split strategy")
     parser.add_argument("--mode", type=str, default="multimodal", choices=["multimodal", "video_only", "sensor_only"], help="Model mode")
-    parser.add_argument("--video_backbone", type=str, default="resnet18", choices=["resnet18", "lightweight"], help="Video backbone")
+    parser.add_argument("--video_backbone", type=str, default="cnn", choices=["cnn", "custom_cnn", "mobilenet_v2", "resnet18", "lightweight"], help="Video backbone")
     parser.add_argument("--sensor_backbone", type=str, default="inception_time", choices=["inception_time", "cnn1d"], help="Sensor backbone")
     parser.add_argument("--freeze_video", action="store_true", help="Freeze video backbone feature extractor")
+    parser.add_argument("--early_stopping_patience", type=int, default=0, help="Epochs without improvement before early stopping (0=disabled)")
+    parser.add_argument("--resume", type=str, default=None, help="Path to checkpoint to resume training from")
+    parser.add_argument("--checkpoint_name", type=str, default=None, help="Custom filename for saved checkpoint")
     parser.add_argument("--output_dir", type=str, default="outputs", help="Directory for artifacts")
     parser.add_argument("--cache_dir", type=str, default="outputs/cache", help="Cache directory for preprocessed tensors")
     parser.add_argument("--num_workers", type=int, default=0, help="DataLoader workers")
@@ -238,16 +242,30 @@ def main():
     scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=args.epochs, eta_min=1e-6)
 
     # 5. Training Loop
-    print(f"\n[Step 5] Training for {args.epochs} epochs...")
+    start_epoch = 1
     best_val_f1 = -1.0
     history = {"train_loss": [], "val_loss": [], "train_acc": [], "val_acc": []}
+    patience_counter = 0
+
+    if args.resume and Path(args.resume).exists():
+        print(f"\n[Resume] Loading checkpoint from: {args.resume}")
+        resume_ckpt = torch.load(args.resume, map_location=device)
+        model.load_state_dict(resume_ckpt["model_state_dict"])
+        if "optimizer_state_dict" in resume_ckpt:
+            optimizer.load_state_dict(resume_ckpt["optimizer_state_dict"])
+        start_epoch = resume_ckpt.get("epoch", 0) + 1
+        best_val_f1 = resume_ckpt.get("val_f1", -1.0)
+        history = resume_ckpt.get("history", history)
+        print(f"  --> Resuming from Epoch {start_epoch} (Prior Best Val F1: {best_val_f1:.4f})")
+
+    print(f"\n[Step 5] Training for {args.epochs} epochs (Starting at epoch {start_epoch})...")
     start_time = time.time()
 
     last_val_labels = None
     last_val_probs = None
     best_metrics = None
 
-    for epoch in range(1, args.epochs + 1):
+    for epoch in range(start_epoch, args.epochs + 1):
         epoch_start = time.time()
         train_loss, train_acc = train_one_epoch(model, train_loader, criterion, optimizer, device, args.mode)
         val_metrics, val_labels, val_probs = evaluate(model, val_loader, criterion, device, args.mode, VERIFIED_TARGET_CLASSES)
@@ -269,7 +287,7 @@ def main():
             f"Val Loss: {val_loss:.4f}, Val Acc: {val_acc:.2f}%, Val Macro F1: {val_f1:.4f}"
         )
 
-        # Save checkpoint
+        # Checkpoint state
         ckpt_state = {
             "epoch": epoch,
             "model_state_dict": model.state_dict(),
@@ -280,35 +298,56 @@ def main():
             "val_f1": val_f1,
             "classes": VERIFIED_TARGET_CLASSES,
             "config": vars(args),
+            "history": history,
             "is_synthetic": is_synthetic,
         }
 
-        # Latest
+        # Save latest
+        latest_filename = f"latest_model_{args.video_backbone}.pth"
+        torch.save(ckpt_state, ckpt_dir / latest_filename)
         torch.save(ckpt_state, ckpt_dir / "latest_model.pth")
 
-        # Best
+        # Save best
         if val_f1 > best_val_f1:
             best_val_f1 = val_f1
             best_metrics = val_metrics
             last_val_labels = val_labels
             last_val_probs = val_probs
+            patience_counter = 0
+
+            best_filename = args.checkpoint_name or f"best_model_{args.video_backbone}.pth"
+            torch.save(ckpt_state, ckpt_dir / best_filename)
             torch.save(ckpt_state, ckpt_dir / "best_model.pth")
-            print(f"  --> Saved new best checkpoint (Macro F1: {best_val_f1:.4f})")
+            print(f"  --> Saved new best checkpoint: {best_filename} (Macro F1: {best_val_f1:.4f})")
+        else:
+            patience_counter += 1
+            if args.early_stopping_patience > 0 and patience_counter >= args.early_stopping_patience:
+                print(f"\n[Early Stopping] No improvement in validation F1 for {patience_counter} consecutive epochs. Stopping early at epoch {epoch}.")
+                break
 
     total_training_time = time.time() - start_time
-    best_ckpt_path = ckpt_dir / "best_model.pth"
+    chosen_ckpt = args.checkpoint_name or f"best_model_{args.video_backbone}.pth"
+    best_ckpt_path = ckpt_dir / chosen_ckpt
     best_ckpt_size_mb = best_ckpt_path.stat().st_size / (1024 * 1024) if best_ckpt_path.exists() else 0.0
 
     print("\n" + "=" * 80)
     print(" TRAINING COMPLETE")
     print("=" * 80)
+    print(f" Model Architecture   : {args.video_backbone} + {args.sensor_backbone}")
     print(f" Total Runtime        : {total_training_time:.2f} seconds")
     print(f" Best Validation F1   : {best_val_f1:.4f}")
     print(f" Best Checkpoint Saved: {best_ckpt_path} ({best_ckpt_size_mb:.2f} MB)")
     print("=" * 80)
 
-    # 6. Generate and save plots
-    print("\n[Step 6] Generating visualization plots in outputs/plots/ ...")
+    # 6. Generate and save plots (stating model, split, and configuration)
+    print(f"\n[Step 6] Generating visualization plots for {args.video_backbone} in outputs/plots/ ...")
+    plot_training_curves(
+        history["train_loss"],
+        history["val_loss"],
+        history["train_acc"],
+        history["val_acc"],
+        plots_dir / f"training_curves_{args.video_backbone}.png",
+    )
     plot_training_curves(
         history["train_loss"],
         history["val_loss"],
@@ -316,16 +355,27 @@ def main():
         history["val_acc"],
         plots_dir / "training_curves.png",
     )
-    print(f"  - Saved training curves to: {plots_dir / 'training_curves.png'}")
 
+    plot_loss_curve_standalone(
+        history["train_loss"],
+        history["val_loss"],
+        plots_dir / f"train_vs_val_loss_{args.video_backbone}.png",
+        num_layers=4,
+    )
     plot_loss_curve_standalone(
         history["train_loss"],
         history["val_loss"],
         plots_dir / "train_vs_val_loss.png",
         num_layers=4,
     )
-    print(f"  - Saved standalone loss curve to: {plots_dir / 'train_vs_val_loss.png'}")
 
+    plot_accuracy_curve_standalone(
+        history["train_acc"],
+        history["val_acc"],
+        plots_dir / f"train_vs_val_accuracy_{args.video_backbone}.png",
+        eval_label="Validation",
+        num_layers=4,
+    )
     plot_accuracy_curve_standalone(
         history["train_acc"],
         history["val_acc"],
@@ -333,21 +383,28 @@ def main():
         eval_label="Validation",
         num_layers=4,
     )
-    print(f"  - Saved standalone validation accuracy curve to: {plots_dir / 'train_vs_val_accuracy.png'}")
 
     if best_metrics and "confusion_matrix" in best_metrics:
         cm_array = np.array(best_metrics["confusion_matrix"])
-        title = f"Validation Confusion Matrix ({'SYNTHETIC' if is_synthetic else 'GENUINE'})"
+        title = f"Val Confusion Matrix - {args.video_backbone.upper()} ({args.split_strategy} split)"
+        plot_confusion_matrix(cm_array, VERIFIED_TARGET_CLASSES, plots_dir / f"val_confusion_matrix_{args.video_backbone}.png", title=title)
         plot_confusion_matrix(cm_array, VERIFIED_TARGET_CLASSES, plots_dir / "val_confusion_matrix.png", title=title)
-        print(f"  - Saved confusion matrix to: {plots_dir / 'val_confusion_matrix.png'}")
 
     if last_val_labels is not None and last_val_probs is not None:
+        plot_multiclass_roc(last_val_labels, last_val_probs, VERIFIED_TARGET_CLASSES, plots_dir / f"val_roc_ovr_{args.video_backbone}.png")
+        plot_multiclass_pr(last_val_labels, last_val_probs, VERIFIED_TARGET_CLASSES, plots_dir / f"val_pr_curves_{args.video_backbone}.png")
         plot_multiclass_roc(last_val_labels, last_val_probs, VERIFIED_TARGET_CLASSES, plots_dir / "val_roc_ovr.png")
         plot_multiclass_pr(last_val_labels, last_val_probs, VERIFIED_TARGET_CLASSES, plots_dir / "val_pr_curves.png")
-        print(f"  - Saved ROC curves to: {plots_dir / 'val_roc_ovr.png'}")
-        print(f"  - Saved PR curves to: {plots_dir / 'val_pr_curves.png'}")
 
-    # 7. Save summary JSON
+    if best_metrics and "per_class" in best_metrics:
+        plot_per_class_metrics(
+            best_metrics["per_class"],
+            plots_dir / f"val_per_class_{args.video_backbone}.png",
+            model_name=args.video_backbone.upper(),
+            split_name=f"Validation ({args.split_strategy})",
+        )
+
+    # 7. Save history and summary JSON
     summary = {
         "dataset_root": str(data_path),
         "is_synthetic": is_synthetic,
@@ -361,9 +418,13 @@ def main():
         "best_metrics": best_metrics,
         "history": history,
     }
+    with open(output_dir / f"training_summary_{args.video_backbone}.json", "w") as f:
+        json.dump(summary, f, indent=2)
     with open(output_dir / "training_summary.json", "w") as f:
         json.dump(summary, f, indent=2)
-    print(f"  - Saved training summary to: {output_dir / 'training_summary.json'}")
+    with open(output_dir / f"history_{args.video_backbone}.json", "w") as f:
+        json.dump(history, f, indent=2)
+    print(f"  - Saved training summaries to: {output_dir / f'training_summary_{args.video_backbone}.json'}")
 
 
 if __name__ == "__main__":
