@@ -72,6 +72,8 @@ def parse_args():
     parser.add_argument("--early_stopping_patience", type=int, default=0, help="Epochs without improvement before early stopping (0=disabled)")
     parser.add_argument("--min_epochs", type=int, default=50, help="Minimum number of epochs to train before early stopping can trigger (default: 50)")
     parser.add_argument("--resume", type=str, default=None, help="Path to checkpoint to resume training from")
+    parser.add_argument("--auto_resume", action="store_true", help="Automatically resume from latest checkpoint in output_dir if present")
+    parser.add_argument("--skip_if_completed", action="store_true", help="Skip training if experiment has already completed successfully")
     parser.add_argument("--checkpoint_name", type=str, default=None, help="Custom filename for saved checkpoint")
     parser.add_argument("--output_dir", type=str, default="outputs", help="Directory for artifacts")
     parser.add_argument("--cache_dir", type=str, default="outputs/cache", help="Cache directory for preprocessed tensors")
@@ -128,6 +130,10 @@ def train_one_epoch(model, loader, criterion, optimizer, device, mode, scaler=No
         preds = logits.detach().argmax(dim=-1)
         correct += (preds == label).sum().item()
         total += batch_size
+
+        if len(loader) >= 8 and (batch_idx + 1) % max(1, len(loader) // 4) == 0:
+            pct = int((batch_idx + 1) / len(loader) * 100)
+            print(f"    [Batch {batch_idx + 1:02d}/{len(loader):02d} ({pct}%)] Loss: {loss.detach().item():.4f}")
 
     avg_loss = total_loss / total if total > 0 else 0.0
     accuracy = (correct / total * 100.0) if total > 0 else 0.0
@@ -198,6 +204,38 @@ def main():
     print(f" Epochs          : {args.epochs} | Batch Size: {args.batch_size} | LR: {args.lr}")
     print(f" Random Seed     : {args.seed}")
     print("=" * 80)
+
+    # 0. Check if experiment already completed (avoid redundant work)
+    target_ckpt_name = args.checkpoint_name or f"best_model_{args.video_backbone}.pth"
+    best_ckpt_file = ckpt_dir / target_ckpt_name
+    summary_file = output_dir / f"training_summary_{args.video_backbone}.json"
+
+    if args.skip_if_completed and summary_file.exists() and best_ckpt_file.exists():
+        try:
+            with open(summary_file) as f:
+                prev_summary = json.load(f)
+            prev_eps = len(prev_summary.get("history", {}).get("train_loss", []))
+            if prev_eps >= min(args.epochs, args.min_epochs):
+                test_ckpt = torch.load(best_ckpt_file, map_location="cpu")
+                if "model_state_dict" in test_ckpt:
+                    best_f1 = prev_summary.get("best_metrics", {}).get("macro_f1", 0.0)
+                    print("\n" + "=" * 80)
+                    print(f"[SKIP] Experiment in {output_dir} has already completed successfully ({prev_eps}/{args.epochs} epochs).")
+                    print(f"       Found valid checkpoint: {best_ckpt_file} (Best Val F1: {best_f1:.4f})")
+                    print("       Skipping training run to prevent redundant execution.")
+                    print("=" * 80)
+                    return
+        except Exception as e:
+            print(f"[Warning] Could not verify existing summary/checkpoint: {e}")
+
+    # Auto-resume from latest checkpoint if requested and available
+    if args.auto_resume and not args.resume:
+        latest_file = ckpt_dir / f"latest_model_{args.video_backbone}.pth"
+        if not latest_file.exists():
+            latest_file = ckpt_dir / "latest_model.pth"
+        if latest_file.exists():
+            args.resume = str(latest_file)
+            print(f"\n[Auto-Resume] Found existing interrupted checkpoint at: {args.resume}")
 
     # 1. Dataset verification & indexing
     if args.smoke_test:
@@ -435,8 +473,15 @@ def main():
         history["peak_gpu_mem_mb"].append(peak_mem)
 
         mem_info = f", Peak GPU: {peak_mem}MB" if device.type == "cuda" else ""
+        elapsed_total = time.time() - start_time
+        completed_eps = epoch - start_epoch + 1
+        rem_eps = args.epochs - epoch
+        avg_ep_dur = elapsed_total / max(1, completed_eps)
+        eta_sec = rem_eps * avg_ep_dur
+        eta_str = time.strftime("%H:%M:%S", time.gmtime(max(0, eta_sec)))
+
         print(
-            f"Epoch {epoch:03d}/{args.epochs:03d} [{epoch_dur:.1f}s (train: {train_dur:.1f}s, val: {val_dur:.1f}s){mem_info}] - "
+            f"Epoch {epoch:03d}/{args.epochs:03d} [{epoch_dur:.1f}s, ETA: {eta_str}{mem_info}] - "
             f"Train Loss: {train_loss:.4f}, Train Acc: {train_acc:.2f}% | "
             f"Val Loss: {val_loss:.4f}, Val Acc: {val_acc:.2f}%, Val Macro F1: {val_f1:.4f}"
         )

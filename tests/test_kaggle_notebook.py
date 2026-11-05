@@ -8,7 +8,11 @@ from pathlib import Path
 
 
 def test_kaggle_notebook_structure():
-    for nb_file in ["notebooks/kaggle_mmact_har.ipynb", "notebooks/kaggle_mmact_har_benchmark_50ep.ipynb"]:
+    for nb_file in [
+        "notebooks/kaggle_mmact_har.ipynb",
+        "notebooks/kaggle_mmact_har_benchmark_50ep.ipynb",
+        "notebooks/kaggle_mmact_har_complete_fast.ipynb",
+    ]:
         nb_path = Path(nb_file)
         assert nb_path.exists(), f"Notebook file {nb_file} missing!"
 
@@ -187,3 +191,32 @@ def test_abi_import_checks():
     t = torch.randn(2, 2)
     t_np = t.numpy()
     assert t_np.shape == (2, 2)
+
+
+def test_complete_fast_notebook_sections():
+    nb_path = Path("notebooks/kaggle_mmact_har_complete_fast.ipynb")
+    assert nb_path.exists(), "notebooks/kaggle_mmact_har_complete_fast.ipynb missing!"
+    with open(nb_path, "r", encoding="utf-8") as f:
+        nb = json.load(f)
+
+    full_code = ""
+    for cell in nb["cells"]:
+        if cell["cell_type"] == "code":
+            full_code += "".join(cell["source"]) + "\n"
+
+    # Verify key requirements are implemented in the fast notebook
+    assert "FastMMActStager" in full_code
+    assert "staging_report" in full_code
+    assert "warm_up_cache" in full_code
+    assert "--auto_resume" in full_code
+    assert "--skip_if_completed" in full_code
+    assert "--benchmark_warmup" in full_code
+    assert "best_model_cnn.pth" in full_code
+    assert "best_model_tuned_cnn.pth" in full_code
+    assert "best_model_mobilenet_v2.pth" in full_code
+    assert "best_model_sensor.pth" in full_code
+    assert "best_model_multimodal.pth" in full_code
+    assert "har_mmact_results.zip" in full_code
+    assert "RUN_EXTENDED" in full_code
+    assert len(nb["cells"]) >= 30
+

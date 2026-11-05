@@ -295,12 +295,13 @@ Outputs:
 
 ## 8. Kaggle Cloud GPU Execution
 
-For seamless cloud execution on Kaggle GPU, a separate updated notebook is available:
-- **Primary 50-Epoch Benchmark Notebook**: [`notebooks/kaggle_mmact_har_benchmark_50ep.ipynb`](notebooks/kaggle_mmact_har_benchmark_50ep.ipynb)
+For seamless cloud execution on Kaggle GPU, three notebooks are available in `notebooks/`:
+- **Complete Fast Notebook (Recommended)**: [`notebooks/kaggle_mmact_har_complete_fast.ipynb`](notebooks/kaggle_mmact_har_complete_fast.ipynb) — Featuring shallow bounded discovery (0.3s), idempotent staging with preflight report, zero duplicate links, auto-resume, skip-if-completed, AMP acceleration, and optional extended benchmarks.
+- **50-Epoch Benchmark Notebook**: [`notebooks/kaggle_mmact_har_benchmark_50ep.ipynb`](notebooks/kaggle_mmact_har_benchmark_50ep.ipynb)
 - **Standard Pipeline Notebook**: [`notebooks/kaggle_mmact_har.ipynb`](notebooks/kaggle_mmact_har.ipynb)
 
-Both notebooks run completely top-to-bottom without manual intervention:
-1. **Upload Notebook to Kaggle**: Import `notebooks/kaggle_mmact_har_benchmark_50ep.ipynb` as a new Kaggle Notebook.
+All notebooks run completely top-to-bottom without manual intervention:
+1. **Upload Notebook to Kaggle**: Import `notebooks/kaggle_mmact_har_complete_fast.ipynb` as a new Kaggle Notebook.
 2. **Configure Session Options**:
    - **Accelerator**: `GPU T4 x2` or `GPU P100`
    - **Internet**: `On` (required to sync repository and pretrained weights)

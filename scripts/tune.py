@@ -53,6 +53,7 @@ def parse_args():
     parser.add_argument("--no_amp", action="store_true", help="Disable AMP during tuning")
     parser.add_argument("--pin_memory", action="store_true", default=True, help="Enable DataLoader pin_memory")
     parser.add_argument("--cache_dir", type=str, default=None, help="Cache directory for preprocessed tensors")
+    parser.add_argument("--skip_if_completed", action="store_true", help="Skip tuning if optimal hyperparameters already saved")
     parser.add_argument("--output_dir", type=str, default="outputs/tuning", help="Tuning output directory")
     parser.add_argument("--plots_dir", type=str, default="outputs/plots", help="Plots directory")
     parser.add_argument("--seed", type=int, default=42, help="Random seed")
@@ -132,6 +133,21 @@ def main():
     if not data_path.exists():
         print(f"[ERROR] Data root not found: {data_path}")
         sys.exit(1)
+
+    # Check if tuning is already completed
+    best_json = output_dir / "best_hyperparameters.json"
+    if args.skip_if_completed and best_json.exists():
+        try:
+            with open(best_json) as f:
+                best_data = json.load(f)
+            if "lr" in best_data and "weight_decay" in best_data:
+                print("\n" + "=" * 80)
+                print(f"[SKIP] Hyperparameter tuning already completed! Found: {best_json}")
+                print(f"       Reusing optimal configuration: {best_data}")
+                print("=" * 80)
+                return
+        except Exception as e:
+            print(f"[Warning] Could not read existing tuning output: {e}")
 
     print("=" * 80)
     print(" HAR_MMAct: Hyperparameter Search Pipeline")

@@ -47,6 +47,7 @@ def parse_args():
     parser.add_argument("--cache_dir", type=str, default=None, help="Cache directory for preprocessed tensors")
     parser.add_argument("--output_file", type=str, default="outputs/metrics.json", help="Path to save evaluation metrics")
     parser.add_argument("--plots_dir", type=str, default="outputs/plots", help="Directory for evaluation plots")
+    parser.add_argument("--skip_if_completed", action="store_true", help="Skip evaluation if output_file already exists")
     parser.add_argument("--smoke_test", action="store_true", help="Force evaluate on synthetic data split")
     return parser.parse_args()
 
@@ -87,6 +88,17 @@ def run_evaluation_for_mode(model, loader, device, mode, class_names, use_amp=Fa
 
 def main():
     args = parse_args()
+    out_file = Path(args.output_file)
+    if args.skip_if_completed and out_file.exists():
+        try:
+            with open(out_file) as f:
+                data = json.load(f)
+            if any(k in data for k in ["multimodal", "video_only", "sensor_only"]):
+                print(f"[SKIP] Evaluation already completed! Reusing existing metrics at: {out_file}")
+                return
+        except Exception:
+            pass
+
     ckpt_path = Path(args.checkpoint)
 
     if not ckpt_path.exists():

@@ -1,31 +1,30 @@
 """
-create_kaggle_notebook.py - Generates the complete 15-section Kaggle benchmark notebook for MMAct HAR.
+create_kaggle_notebook.py - Generates the complete, fast, reproducible Kaggle notebook for MMAct HAR.
 
-Structure:
-Section 1:  Environment & Dependencies Setup (Preserving Kaggle C ABI)
-Section 2:  Preflight Hardware & GPU Diagnostics (CUDA, VRAM, CPU, RAM, Disk)
-Section 3:  Repository Checkout from master Branch
-Section 4:  Dataset Discovery & Multi-Root Staging (Symlink-Safe)
-Section 5:  Label Mapping & Pre-Flight Modality Audit (Zero-Leakage Split)
-Section 6:  Video & Sensor Preprocessing Cache Warm-Up (/kaggle/working/har_mmact_cache)
-Section 7:  Memory-Safe Calibration & OOM Warm-Up
-Section 8:  Experiment 1: Improved Custom CNN Baseline (50 Epochs, AMP, Regularization)
-Section 9:  Experiment 2: Hyperparameter Tuning (Train/Val only) & Tuned CNN (50 Epochs)
-Section 10: Experiment 3: MobileNetV2 Staged Fine-Tuning (50 Epochs, AMP)
-Section 11: Experiments 4 & 5: Sensor-Only InceptionTime & Multimodal Late Fusion (50 Epochs)
-Section 12: Standalone Evaluation on Held-Out Test Set (All 5 Models)
-Section 13: Comprehensive Publication Visualizations & Galleries
-Section 14: Sample Multimodal Inference Demonstration
-Section 15: Consolidated Summary Table, Manifest, Runtime Report & 1-Click Packaging
+Target Output: notebooks/kaggle_mmact_har_complete_fast.ipynb
+Preserves existing notebooks (kaggle_mmact_har.ipynb, kaggle_mmact_har_benchmark_50ep.ipynb) untouched.
 
-SAFETY GUARANTEE:
-Target notebook is notebooks/kaggle_mmact_har_benchmark_50ep.ipynb to ensure
-any currently active Kaggle notebook session is never disturbed.
+Sections:
+1. Environment & Dependencies Setup (Preserving Kaggle C ABI)
+2. Preflight Hardware & GPU Diagnostics (CUDA, VRAM, CPU, RAM, Disk, fail-loud if no GPU)
+3. Repository Checkout from master Branch
+4. Dataset Discovery & Multi-Root Staging (Idempotent, Shallow Inspection, FastMMActStager)
+5. Label Mapping & Pre-Flight Modality Audit (Zero-Leakage Split across 10 target classes)
+6. Video & Sensor Preprocessing Cache Warm-Up (/kaggle/working/har_mmact_cache)
+7. Memory-Safe Calibration & OOM Warm-Up
+8. Experiment 1: Improved Custom CNN Baseline (50 Epochs, AMP, Regularization, Skip-if-completed, Auto-resume)
+9. Experiment 2: Hyperparameter Tuning (Train/Val only) & Tuned CNN (50 Epochs)
+10. Experiment 3: MobileNetV2 Staged Fine-Tuning (50 Epochs, AMP)
+11. Experiments 4 & 5: Sensor-Only InceptionTime & Multimodal Late Fusion (50 Epochs)
+12. Standalone Evaluation on Held-Out Test Set (All 5 Models)
+13. Comprehensive Publication Visualizations & Galleries
+14. Sample Multimodal Inference Demonstration
+15. Consolidated Summary Table, Manifest, Runtime Report & 1-Click Packaging (har_mmact_results.zip)
+16. (Optional) Extended Benchmarks (100/150 Epochs)
 """
 
 import argparse
 import json
-import sys
 from pathlib import Path
 
 
@@ -37,17 +36,17 @@ def generate_benchmark_cells():
             "metadata": {},
             "source": [
                 "# Multimodal Human Activity Recognition on MMAct (Kaggle GPU Pipeline)\n",
-                "## 50-Epoch Benchmark: Custom CNN, Tuned CNN, MobileNetV2 Staged Fine-Tuning, Sensor-Only, and Multimodal Fusion\n",
+                "## Fast, Reliable, Complete 50-Epoch Benchmark: Custom CNN, Tuned CNN, MobileNetV2 Staged Fine-Tuning, Sensor-Only, and Multimodal Fusion\n",
                 "\n",
-                "This benchmark notebook executes the complete Multimodal Human Activity Recognition (HAR) pipeline on the **MMAct dataset** across 15 structured sections:\n",
+                "This notebook executes the complete Multimodal Human Activity Recognition (HAR) pipeline on the **MMAct dataset** across structured, bounded sections:\n",
                 "- **Section 1**: Environment & Dependencies Setup (strictly preserving Kaggle's binary C ABI stack)\n",
-                "- **Section 2**: Preflight Hardware & GPU Diagnostics (CUDA device, memory headroom, CPU, RAM, disk)\n",
+                "- **Section 2**: Preflight Hardware & GPU Diagnostics (CUDA device, memory headroom, CPU, RAM, disk, fail-loud GPU check)\n",
                 "- **Section 3**: Repository Checkout from `master` branch\n",
-                "- **Section 4**: Multi-Root Dataset Discovery & Canonical Staging\n",
-                "- **Section 5**: Label Mapping & Pre-Flight Modality Audit (Zero-Leakage Split Verification)\n",
+                "- **Section 4**: Fast, Idempotent Dataset Discovery & Canonical Staging (shallow inspection, zero duplicate links, preflight audit report)\n",
+                "- **Section 5**: Label Mapping & Pre-Flight Modality Audit (Zero-Leakage Split Verification across 10 target classes)\n",
                 "- **Section 6**: Video & Sensor Preprocessing Cache Warm-Up (`/kaggle/working/har_mmact_cache`)\n",
                 "- **Section 7**: Memory-Safe Calibration & OOM Warm-Up\n",
-                "- **Section 8**: Experiment 1: Improved Custom CNN Baseline (50 epochs, AMP, spatial dropout, weight decay)\n",
+                "- **Section 8**: Experiment 1: Improved Custom CNN Baseline (50 epochs, AMP, spatial dropout, weight decay, skip-if-completed)\n",
                 "- **Section 9**: Experiment 2: Hyperparameter Tuning (train/val only) & Tuned CNN (50 epochs)\n",
                 "- **Section 10**: Experiment 3: MobileNetV2 Transfer Learning with Staged Fine-Tuning (50 epochs, AMP)\n",
                 "- **Section 11**: Experiments 4 & 5: Sensor-Only InceptionTime & Multimodal Late Fusion (50 epochs each)\n",
@@ -55,6 +54,7 @@ def generate_benchmark_cells():
                 "- **Section 13**: Comprehensive Publication Visualizations & Galleries (annotated curves, ROC, PR, confusion matrices)\n",
                 "- **Section 14**: Sample Multimodal Inference Demonstration\n",
                 "- **Section 15**: Consolidated Summary Table, Manifest, Runtime Report & 1-Click Packaging (`har_mmact_results.zip`)\n",
+                "- **Section 16**: (Optional) Extended Benchmarks (100 and 150 Epochs for extended quota)\n",
                 "\n",
                 "All experiments evaluate on the **10 verified target activity classes**:\n",
                 "`crouching`, `jumping`, `kicking`, `pointing`, `running`, `sitting`, `standing`, `using_phone`, `walking`, `waving_hand`.\n",
@@ -245,7 +245,7 @@ def generate_benchmark_cells():
                 "\n",
                 "# 3. Runtime Training Settings\n",
                 "print('\\nRuntime Acceleration Configuration:')\n",
-                "print('  - Batch Size          : 8 (optimal for 16-frame 112x112 video + 9-channel sensor)')\n",
+                "print('  - Batch Size          : 8 (calibrated for 16-frame 112x112 video + 9-channel sensor)')\n",
                 "print('  - DataLoader Workers  : 2 (non-blocking pin_memory)')\n",
                 "print('  - Automatic Mixed Prec: ENABLED (torch.amp.autocast, float16)')\n",
                 "print('  - cuDNN Benchmark     : ENABLED (torch.backends.cudnn.benchmark = True)')\n",
@@ -303,6 +303,7 @@ def generate_benchmark_cells():
                 "    PROJECT_ROOT / 'src' / 'data' / 'ingestion.py',\n",
                 "    PROJECT_ROOT / 'src' / 'data' / 'indexer.py',\n",
                 "    PROJECT_ROOT / 'src' / 'data' / 'dataset.py',\n",
+                "    PROJECT_ROOT / 'src' / 'data' / 'stager.py',\n",
                 "    PROJECT_ROOT / 'scripts' / 'train.py',\n",
                 "    PROJECT_ROOT / 'scripts' / 'tune.py',\n",
                 "    PROJECT_ROOT / 'scripts' / 'evaluate.py',\n",
@@ -323,9 +324,10 @@ def generate_benchmark_cells():
                 "from src.data.ingestion import DatasetIngestionPipeline\n",
                 "from src.data.indexer import MMActIndexer\n",
                 "from src.data.dataset import MMActMultimodalDataset\n",
+                "from src.data.stager import FastMMActStager, StagingReport\n",
                 "from src.models.fusion_model import MultimodalHARModel\n",
                 "from src.utils.plots import plot_cross_model_comparison, plot_modality_ablation\n",
-                "print('SUCCESS: Verified project imports (ingestion, indexer, dataset, models, plots).')\n"
+                "print('SUCCESS: Verified project imports (ingestion, indexer, dataset, stager, models, plots).')\n"
             ]
         },
 
@@ -334,8 +336,14 @@ def generate_benchmark_cells():
             "cell_type": "markdown",
             "metadata": {},
             "source": [
-                "## Section 4: Dataset Discovery & Multi-Root Staging (Symlink-Safe)\n",
-                "Crawls `/kaggle/input`, detects all attached MMAct dataset directories and archives, safely unpacks archives if needed, and stages a canonical dataset hierarchy at `/kaggle/working/HAR-MMAct/data/genuine_mmact/`."
+                "## Section 4: Fast, Idempotent Dataset Discovery & Canonical Staging\n",
+                "Discovers the attached dataset using shallow directory inspection (bounded depth $\\le$ 4) across `/kaggle/input`, avoids unbounded recursive file walking over mounted filesystems, and idempotently stages a canonical dataset hierarchy at `/kaggle/working/HAR-MMAct/data/genuine_mmact/`.\n",
+                "\n",
+                "**Guarantees:**\n",
+                "- Idempotent: Re-running skips valid existing links/files; creates zero duplicate or nested links.\n",
+                "- Never deletes the canonical directory.\n",
+                "- Cycle & symlink loop protected.\n",
+                "- Preflight audit report prints selected root, modalities, counts, duration, and reuse status."
             ]
         },
         {
@@ -344,137 +352,34 @@ def generate_benchmark_cells():
             "metadata": {},
             "outputs": [],
             "source": [
-                "# Section 4: Dataset Discovery & Multi-Root Staging\n",
-                "import os\n",
-                "import re\n",
-                "import shutil\n",
+                "# Section 4: Fast, Idempotent Dataset Discovery & Canonical Staging\n",
                 "from pathlib import Path\n",
-                "from src.data.ingestion import DatasetIngestionPipeline\n",
-                "from src.data.indexer import MMActIndexer\n",
+                "from src.data.stager import FastMMActStager\n",
                 "\n",
                 "kaggle_input = Path('/kaggle/input')\n",
                 "canonical_data_dir = PROJECT_ROOT / 'data' / 'genuine_mmact'\n",
-                "canonical_trimmed = canonical_data_dir / 'trimmed'\n",
-                "canonical_video = canonical_trimmed / 'video'\n",
-                "canonical_sensors = canonical_trimmed / 'sensors'\n",
-                "canonical_splits = canonical_trimmed / 'splits'\n",
                 "\n",
-                "canonical_video.mkdir(parents=True, exist_ok=True)\n",
-                "canonical_sensors.mkdir(parents=True, exist_ok=True)\n",
-                "canonical_splits.mkdir(parents=True, exist_ok=True)\n",
-                "\n",
-                "print('=' * 78)\n",
-                "print('MULTI-DATASET INSPECTION & CANONICAL INGESTION')\n",
-                "print('=' * 78)\n",
-                "\n",
-                "# 1. Inspect all attached dataset directories under /kaggle/input\n",
+                "# Candidate roots to inspect shallowly\n",
                 "input_roots = sorted([p for p in kaggle_input.iterdir() if p.is_dir()]) if kaggle_input.exists() else []\n",
                 "if not input_roots:\n",
                 "    local_data = PROJECT_ROOT / 'data'\n",
                 "    if local_data.exists():\n",
                 "        input_roots = [local_data]\n",
                 "\n",
-                "print(f'Found {len(input_roots)} top-level dataset roots:')\n",
-                "for root in input_roots:\n",
-                "    print(f'  - {root.name} ({root})')\n",
+                "print(f'Scanning {len(input_roots)} candidate input roots using shallow bounded inspection (max_depth=4)...')\n",
+                "stager = FastMMActStager(\n",
+                "    canonical_dir=canonical_data_dir,\n",
+                "    input_roots=input_roots,\n",
+                "    max_scan_depth=4,\n",
+                ")\n",
                 "\n",
-                "def find_all_files(root: Path, extensions: set) -> list:\n",
-                "    return MMActIndexer.find_files_recursively(root, extensions)\n",
+                "staging_report = stager.discover_and_stage()\n",
+                "print(staging_report.summary())\n",
                 "\n",
-                "def safe_link_or_copy(src: Path, dst: Path):\n",
-                "    if dst.exists():\n",
-                "        if dst.is_symlink() or dst.is_file():\n",
-                "            dst.unlink()\n",
-                "        elif dst.is_dir() and not any(dst.iterdir()):\n",
-                "            dst.rmdir()\n",
-                "        else:\n",
-                "            return\n",
-                "    try:\n",
-                "        os.symlink(src.resolve(), dst, target_is_directory=src.is_dir())\n",
-                "        print(f'  [Symlinked] {src.name} -> {dst.relative_to(PROJECT_ROOT)}')\n",
-                "    except Exception:\n",
-                "        if src.is_dir():\n",
-                "            shutil.copytree(src.resolve(), dst, dirs_exist_ok=True)\n",
-                "            print(f'  [Copied Dir] {src.name} -> {dst.relative_to(PROJECT_ROOT)}')\n",
-                "        else:\n",
-                "            shutil.copy2(src.resolve(), dst)\n",
-                "            print(f'  [Copied File] {src.name} -> {dst.relative_to(PROJECT_ROOT)}')\n",
-                "\n",
-                "# 2. Discover and unpack any ZIP / TAR archives\n",
-                "all_archives = []\n",
-                "for r in input_roots:\n",
-                "    for f in find_all_files(r, {'.zip', '.tar.gz', '.tar'}):\n",
-                "        all_archives.append(f)\n",
-                "\n",
-                "if all_archives:\n",
-                "    print(f'\\n[Archives] Discovered {len(all_archives)} dataset archive(s):')\n",
-                "    dest_downloads = PROJECT_ROOT / 'data' / 'downloads'\n",
-                "    dest_downloads.mkdir(parents=True, exist_ok=True)\n",
-                "    for arc in all_archives:\n",
-                "        print(f'  - Archive: {arc.name} ({arc.stat().st_size / (1024**2):.1f} MB)')\n",
-                "        staging_arc = dest_downloads / arc.name\n",
-                "        if not staging_arc.exists():\n",
-                "            try:\n",
-                "                os.symlink(arc.resolve(), staging_arc)\n",
-                "            except Exception:\n",
-                "                shutil.copy2(arc.resolve(), staging_arc)\n",
-                "    ingestion = DatasetIngestionPipeline(incoming_dir=dest_downloads, raw_storage_dir=canonical_trimmed)\n",
-                "    records = ingestion.scan_and_ingest()\n",
-                "    print(f'  - Ingestion processed {len(records)} archive records.')\n",
-                "\n",
-                "# 3. Stage video, sensor, and split files from ALL input roots\n",
-                "discovered_subjects = set()\n",
-                "for r in input_roots:\n",
-                "    for mp4 in find_all_files(r, {'.mp4'}):\n",
-                "        for parent in mp4.parents:\n",
-                "            if re.match(r'^(subject|sub)_?\\d+$', parent.name, re.I):\n",
-                "                norm_subj = MMActIndexer.normalize_identifier(parent.name, 'subject')\n",
-                "                if norm_subj not in discovered_subjects:\n",
-                "                    discovered_subjects.add(norm_subj)\n",
-                "                    dest_subj = canonical_video / 'cross_scene' / 'trainval' / norm_subj\n",
-                "                    dest_subj.parent.mkdir(parents=True, exist_ok=True)\n",
-                "                    safe_link_or_copy(parent, dest_subj)\n",
-                "                break\n",
-                "\n",
-                "for r in input_roots:\n",
-                "    for csv in find_all_files(r, {'.csv'}):\n",
-                "        for parent in csv.parents:\n",
-                "            p_lower = parent.name.lower()\n",
-                "            if p_lower in MMActIndexer.SENSOR_NAME_MAP:\n",
-                "                canon_mod_name = p_lower if p_lower.endswith('_clip') else f'{p_lower}_clip'\n",
-                "                dest_mod = canonical_sensors / canon_mod_name\n",
-                "                dest_mod.mkdir(parents=True, exist_ok=True)\n",
-                "                for s_child in parent.iterdir():\n",
-                "                    if s_child.is_dir() and re.match(r'^(subject|sub)_?\\d+$', s_child.name, re.I):\n",
-                "                        norm_s = MMActIndexer.normalize_identifier(s_child.name, 'subject')\n",
-                "                        safe_link_or_copy(s_child, dest_mod / norm_s)\n",
-                "            elif p_lower in {'sensors', 'sensor', 'trimmed_sensor'}:\n",
-                "                for mod_cand in parent.iterdir():\n",
-                "                    if mod_cand.is_dir():\n",
-                "                        m_lower = mod_cand.name.lower()\n",
-                "                        if m_lower in MMActIndexer.SENSOR_NAME_MAP:\n",
-                "                            canon_mod_name = m_lower if m_lower.endswith('_clip') else f'{m_lower}_clip'\n",
-                "                            dest_mod = canonical_sensors / canon_mod_name\n",
-                "                            dest_mod.mkdir(parents=True, exist_ok=True)\n",
-                "                            for s_child in mod_cand.iterdir():\n",
-                "                                if s_child.is_dir() and re.match(r'^(subject|sub)_?\\d+$', s_child.name, re.I):\n",
-                "                                    norm_s = MMActIndexer.normalize_identifier(s_child.name, 'subject')\n",
-                "                                    safe_link_or_copy(s_child, dest_mod / norm_s)\n",
-                "\n",
-                "discovered_splits = set()\n",
-                "for r in input_roots:\n",
-                "    for txt in find_all_files(r, {'.txt'}):\n",
-                "        txt_name_lower = txt.name.lower()\n",
-                "        if any(k in txt_name_lower for k in ['cross_scene', 'cross_view', 'train', 'val', 'test']):\n",
-                "            if txt.name not in discovered_splits:\n",
-                "                discovered_splits.add(txt.name)\n",
-                "                safe_link_or_copy(txt, canonical_splits / txt.name)\n",
-                "\n",
-                "print(f'\\nCanonical Staging Summary:')\n",
-                "print(f'  - Staged Video Subjects   : {sorted(list(discovered_subjects))}')\n",
-                "print(f'  - Staged Sensor Modalities: {[m.name for m in canonical_sensors.iterdir() if m.is_dir()]}')\n",
-                "print(f'  - Staged Split Files       : {sorted(list(discovered_splits))}')\n",
-                "print('=' * 78)\n"
+                "assert staging_report.is_valid, (\n",
+                "    f'CRITICAL: Dataset discovery & staging failed! Missing required items: {staging_report.missing_required_paths}\\n'\n",
+                "    f'Please ensure the MMAct dataset is attached under /kaggle/input.'\n",
+                ")\n"
             ]
         },
 
@@ -568,6 +473,7 @@ def generate_benchmark_cells():
             "outputs": [],
             "source": [
                 "# Section 6: Video & Sensor Preprocessing Cache Warm-Up\n",
+                "import shutil\n",
                 "from src.data.dataset import MMActMultimodalDataset\n",
                 "\n",
                 "CACHE_DIR = Path('/kaggle/working/har_mmact_cache')\n",
@@ -671,7 +577,7 @@ def generate_benchmark_cells():
             "metadata": {},
             "source": [
                 "## Section 8: Experiment 1 - Improved Custom CNN Baseline (50 Epochs)\n",
-                "Trains the improved custom video CNN baseline for 50 epochs using Spatial Dropout2d, BatchNorm2d, Weight Decay ($10^{-3}$), Cosine Annealing, and Automatic Mixed Precision."
+                "Trains the improved custom video CNN baseline for 50 epochs using Spatial Dropout2d, BatchNorm2d, Weight Decay ($10^{-3}$), Cosine Annealing, Automatic Mixed Precision, and auto-resume protection."
             ]
         },
         {
@@ -702,7 +608,9 @@ def generate_benchmark_cells():
                 "    --checkpoint_name best_model_cnn.pth \\\n",
                 "    --output_dir {out_cnn} \\\n",
                 "    --cache_dir /kaggle/working/har_mmact_cache \\\n",
-                "    --benchmark_warmup\n"
+                "    --benchmark_warmup \\\n",
+                "    --auto_resume \\\n",
+                "    --skip_if_completed\n"
             ]
         },
 
@@ -730,7 +638,8 @@ def generate_benchmark_cells():
                 "    --batch_size 8 \\\n",
                 "    --output_dir outputs/tuning \\\n",
                 "    --plots_dir outputs/plots \\\n",
-                "    --cache_dir /kaggle/working/har_mmact_cache\n",
+                "    --cache_dir /kaggle/working/har_mmact_cache \\\n",
+                "    --skip_if_completed\n",
                 "\n",
                 "# Load best hyperparameters discovered during tuning\n",
                 "import json\n",
@@ -758,7 +667,9 @@ def generate_benchmark_cells():
                 "    --checkpoint_name best_model_tuned_cnn.pth \\\n",
                 "    --output_dir {out_tuned} \\\n",
                 "    --cache_dir /kaggle/working/har_mmact_cache \\\n",
-                "    --benchmark_warmup\n"
+                "    --benchmark_warmup \\\n",
+                "    --auto_resume \\\n",
+                "    --skip_if_completed\n"
             ]
         },
 
@@ -802,7 +713,9 @@ def generate_benchmark_cells():
                 "    --checkpoint_name best_model_mobilenet_v2.pth \\\n",
                 "    --output_dir {out_mob} \\\n",
                 "    --cache_dir /kaggle/working/har_mmact_cache \\\n",
-                "    --benchmark_warmup\n"
+                "    --benchmark_warmup \\\n",
+                "    --auto_resume \\\n",
+                "    --skip_if_completed\n"
             ]
         },
 
@@ -842,7 +755,9 @@ def generate_benchmark_cells():
                 "    --checkpoint_name best_model_sensor.pth \\\n",
                 "    --output_dir {out_sensor} \\\n",
                 "    --cache_dir /kaggle/working/har_mmact_cache \\\n",
-                "    --benchmark_warmup\n",
+                "    --benchmark_warmup \\\n",
+                "    --auto_resume \\\n",
+                "    --skip_if_completed\n",
                 "\n",
                 "print(f'\\n=== Starting Experiment 5: Multimodal Late Fusion ({EPOCHS} Epochs) ===')\n",
                 "!python scripts/train.py \\\n",
@@ -859,7 +774,9 @@ def generate_benchmark_cells():
                 "    --checkpoint_name best_model_multimodal.pth \\\n",
                 "    --output_dir {out_fusion} \\\n",
                 "    --cache_dir /kaggle/working/har_mmact_cache \\\n",
-                "    --benchmark_warmup\n"
+                "    --benchmark_warmup \\\n",
+                "    --auto_resume \\\n",
+                "    --skip_if_completed\n"
             ]
         },
 
@@ -897,7 +814,8 @@ def generate_benchmark_cells():
                 "        --data_root data/genuine_mmact \\\n",
                 "        --output_file {out_d}/metrics.json \\\n",
                 "        --plots_dir {out_d}/plots \\\n",
-                "        --cache_dir /kaggle/working/har_mmact_cache\n",
+                "        --cache_dir /kaggle/working/har_mmact_cache \\\n",
+                "        --skip_if_completed\n",
                 "    with open(f'{out_d}/metrics.json') as f:\n",
                 "        m_data = json.load(f)\n",
                 "    mode_key = 'multimodal' if 'multimodal' in m_data else 'video_only'\n",
@@ -1056,11 +974,58 @@ def generate_benchmark_cells():
                 "# Package into zip archive\n",
                 "archive_path = '/kaggle/working/har_mmact_results'\n",
                 "shutil.make_archive(archive_path, 'zip', results_dir)\n",
+                "zip_file = '/kaggle/working/har_mmact_results.zip'\n",
                 "print('\\n' + '=' * 80)\n",
                 "print('SUCCESS: All benchmark experiments, checkpoints, and visualizations packaged!')\n",
-                "print(f'Download File: {archive_path}.zip')\n",
+                "print(f'Download File: {zip_file}')\n",
                 "print('Available under Kaggle Output tab in the right-hand panel.')\n",
                 "print('=' * 78)\n"
+            ]
+        },
+
+        # --- SECTION 16: OPTIONAL EXTENDED BENCHMARKS ---
+        {
+            "cell_type": "markdown",
+            "metadata": {},
+            "source": [
+                "## Section 16: (Optional) Extended Benchmarks (100 and 150 Epochs)\n",
+                "This section is **strictly optional** and intended for extended GPU quota or overnight execution.\n",
+                "The required 50-epoch benchmark is fully satisfied by Sections 8 through 11. If GPU quota permits, you can toggle `RUN_EXTENDED = True` to train extended checkpoints."
+            ]
+        },
+        {
+            "cell_type": "code",
+            "execution_count": None,
+            "metadata": {},
+            "outputs": [],
+            "source": [
+                "# Section 16: (Optional) Extended Benchmarks (100 and 150 Epochs)\n",
+                "# Set RUN_EXTENDED = True to enable extended training beyond the required 50-epoch baseline.\n",
+                "RUN_EXTENDED = False\n",
+                "EXTENDED_EPOCHS = 100  # Set to 100 or 150\n",
+                "\n",
+                "if RUN_EXTENDED:\n",
+                "    print(f'=== Starting Optional Extended Training ({EXTENDED_EPOCHS} Epochs) ===')\n",
+                "    out_extended = f'outputs/multimodal_extended_{EXTENDED_EPOCHS}ep'\n",
+                "    Path(out_extended).mkdir(parents=True, exist_ok=True)\n",
+                "    !python scripts/train.py \\\n",
+                "        --data_root data/genuine_mmact \\\n",
+                "        --mode multimodal \\\n",
+                "        --video_backbone mobilenet_v2 \\\n",
+                "        --sensor_backbone inception_time \\\n",
+                "        --epochs {EXTENDED_EPOCHS} \\\n",
+                "        --min_epochs {EXTENDED_EPOCHS} \\\n",
+                "        --batch_size 8 \\\n",
+                "        --lr 0.0001 \\\n",
+                "        --weight_decay 0.0005 \\\n",
+                "        --split_strategy subject \\\n",
+                "        --checkpoint_name best_model_multimodal_extended.pth \\\n",
+                "        --output_dir {out_extended} \\\n",
+                "        --cache_dir /kaggle/working/har_mmact_cache \\\n",
+                "        --auto_resume \\\n",
+                "        --skip_if_completed\n",
+                "else:\n",
+                "    print('Optional extended training skipped. Required 50-epoch benchmark is complete.')\n"
             ]
         }
     ]
@@ -1072,13 +1037,8 @@ def main():
     parser.add_argument(
         "--output",
         type=str,
-        default="notebooks/kaggle_mmact_har_benchmark_50ep.ipynb",
-        help="Target notebook file path (default: notebooks/kaggle_mmact_har_benchmark_50ep.ipynb)",
-    )
-    parser.add_argument(
-        "--update_legacy",
-        action="store_true",
-        help="Update legacy notebooks/kaggle_mmact_har.ipynb (disabled by default to prevent disturbing active sessions)",
+        default="notebooks/kaggle_mmact_har_complete_fast.ipynb",
+        help="Target notebook file path (default: notebooks/kaggle_mmact_har_complete_fast.ipynb)",
     )
     args = parser.parse_args()
 
@@ -1106,13 +1066,7 @@ def main():
     target_path.parent.mkdir(parents=True, exist_ok=True)
     with open(target_path, "w", encoding="utf-8") as f:
         json.dump(nb, f, indent=2)
-    print(f"Generated benchmark notebook at: {target_path}")
-
-    if args.update_legacy:
-        legacy_path = Path("notebooks/kaggle_mmact_har.ipynb")
-        with open(legacy_path, "w", encoding="utf-8") as f:
-            json.dump(nb, f, indent=2)
-        print(f"Updated legacy notebook at: {legacy_path}")
+    print(f"Generated complete fast notebook at: {target_path}")
 
 
 if __name__ == "__main__":
