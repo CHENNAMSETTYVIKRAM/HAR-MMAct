@@ -1,0 +1,4 @@
+# Kaggle runtime requirements for HAR_MMAct
+# Preserves preinstalled packages without altering binary extensions
+streamlit>=1.30.0
+pytest-cov>=4.1.0
