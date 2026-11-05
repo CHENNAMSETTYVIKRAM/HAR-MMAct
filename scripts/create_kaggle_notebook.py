@@ -494,7 +494,8 @@ cells = [
         "source": [
             "# Step 6: Experiment 1 - Improved Custom CNN Baseline (50 Epochs)\n",
             "# Features: Spatial Dropout2d, BatchNorm2d, Weight Decay (1e-3), Cosine Annealing, Early Stopping\n",
-            "EPOCHS = 50  # Set to 50 for full experiment or 3 for fast verification\n",
+            "# Note: Set EPOCHS = 50 for the required benchmark, or 100/150 for extended experiments if Kaggle GPU quota permits.\n",
+            "EPOCHS = 50\n",
             "out_cnn = 'outputs/baseline_cnn'\n",
             "Path(out_cnn).mkdir(parents=True, exist_ok=True)\n",
             "\n",
@@ -505,6 +506,7 @@ cells = [
             "    --sensor_backbone inception_time \\\n",
             "    --mode video_only \\\n",
             "    --epochs {EPOCHS} \\\n",
+            "    --min_epochs 50 \\\n",
             "    --batch_size 8 \\\n",
             "    --lr 0.0001 \\\n",
             "    --weight_decay 0.001 \\\n",
@@ -549,6 +551,7 @@ cells = [
             "    --sensor_backbone inception_time \\\n",
             "    --mode video_only \\\n",
             "    --epochs {EPOCHS} \\\n",
+            "    --min_epochs 50 \\\n",
             "    --batch_size 8 \\\n",
             "    --lr {best_cfg['lr']} \\\n",
             "    --weight_decay {best_cfg['weight_decay']} \\\n",
@@ -579,6 +582,7 @@ cells = [
             "    --sensor_backbone inception_time \\\n",
             "    --mode video_only \\\n",
             "    --epochs {EPOCHS} \\\n",
+            "    --min_epochs 50 \\\n",
             "    --batch_size 8 \\\n",
             "    --lr 0.0001 \\\n",
             "    --weight_decay 0.0005 \\\n",
@@ -611,6 +615,7 @@ cells = [
             "    --mode sensor_only \\\n",
             "    --sensor_backbone inception_time \\\n",
             "    --epochs {EPOCHS} \\\n",
+            "    --min_epochs 50 \\\n",
             "    --batch_size 8 \\\n",
             "    --lr 0.0005 \\\n",
             "    --weight_decay 0.0001 \\\n",
@@ -626,6 +631,7 @@ cells = [
             "    --video_backbone mobilenet_v2 \\\n",
             "    --sensor_backbone inception_time \\\n",
             "    --epochs {EPOCHS} \\\n",
+            "    --min_epochs 50 \\\n",
             "    --batch_size 8 \\\n",
             "    --lr 0.0001 \\\n",
             "    --weight_decay 0.0005 \\\n",
@@ -822,4 +828,8 @@ output_nb_path.parent.mkdir(parents=True, exist_ok=True)
 with open(output_nb_path, "w", encoding="utf-8") as f:
     json.dump(nb, f, indent=2)
 
-print(f"Created {output_nb_path} successfully!")
+separate_nb_path = Path("notebooks/kaggle_mmact_har_benchmark_50ep.ipynb")
+with open(separate_nb_path, "w", encoding="utf-8") as f:
+    json.dump(nb, f, indent=2)
+
+print(f"Created {output_nb_path} and {separate_nb_path} successfully!")

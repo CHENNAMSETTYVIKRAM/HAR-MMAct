@@ -176,6 +176,7 @@ def main():
         trial_start = time.time()
         best_trial_val_acc = 0.0
         best_trial_val_f1 = 0.0
+        trial_epoch_history = []
 
         for ep in range(1, args.epochs_per_trial + 1):
             t_loss, t_acc = train_epoch(model, train_loader, criterion, optimizer, device)
@@ -184,6 +185,17 @@ def main():
 
             v_acc = v_metrics["accuracy"] * 100.0
             v_f1 = v_metrics["macro_f1"]
+            v_loss = v_metrics["loss"]
+
+            trial_epoch_history.append({
+                "epoch": ep,
+                "train_loss": round(t_loss, 4),
+                "train_acc": round(t_acc, 2),
+                "val_loss": round(v_loss, 4),
+                "val_acc": round(v_acc, 2),
+                "val_f1": round(v_f1, 4),
+            })
+
             if v_acc > best_trial_val_acc:
                 best_trial_val_acc = v_acc
                 best_trial_val_f1 = v_f1
@@ -198,6 +210,7 @@ def main():
             "val_accuracy": round(best_trial_val_acc, 2),
             "val_macro_f1": round(best_trial_val_f1, 4),
             "duration_sec": round(trial_dur, 1),
+            "epoch_history": trial_epoch_history,
         }
         trials_history.append(record)
         print(f"    Result: Best Val Acc={best_trial_val_acc:.2f}%, Val Macro F1={best_trial_val_f1:.4f} ({trial_dur:.1f}s)")
@@ -225,18 +238,39 @@ def main():
     with open(output_dir / "best_hyperparameters.json", "w") as f:
         json.dump(best_trial, f, indent=2)
 
-    # CSV history
+    # CSV summary
     csv_file = output_dir / "tuning_history.csv"
     with open(csv_file, "w", newline="") as f:
         writer = csv.DictWriter(f, fieldnames=["trial_id", "name", "lr", "weight_decay", "dropout", "val_accuracy", "val_macro_f1", "duration_sec"])
         writer.writeheader()
-        writer.writerows(trials_history)
+        for r in trials_history:
+            row = {k: v for k, v in r.items() if k != "epoch_history"}
+            writer.writerow(row)
+
+    # Detailed epoch-by-epoch history across trials CSV
+    epoch_csv_file = output_dir / "trial_epoch_histories.csv"
+    with open(epoch_csv_file, "w", newline="") as f:
+        writer = csv.writer(f)
+        writer.writerow(["trial_id", "trial_name", "epoch", "train_loss", "train_acc", "val_loss", "val_acc", "val_f1"])
+        for r in trials_history:
+            for ep_rec in r.get("epoch_history", []):
+                writer.writerow([
+                    r["trial_id"],
+                    r["name"],
+                    ep_rec["epoch"],
+                    ep_rec["train_loss"],
+                    ep_rec["train_acc"],
+                    ep_rec["val_loss"],
+                    ep_rec["val_acc"],
+                    ep_rec["val_f1"],
+                ])
 
     # Generate trial comparison plot
     plot_hyperparameter_trials(trials_history, plots_dir / "hyperparameter_trials.png")
     print(f"\nArtifacts Saved:")
     print(f"  - {output_dir / 'tuning_history.json'}")
     print(f"  - {output_dir / 'tuning_history.csv'}")
+    print(f"  - {output_dir / 'trial_epoch_histories.csv'}")
     print(f"  - {output_dir / 'best_hyperparameters.json'}")
     print(f"  - {plots_dir / 'hyperparameter_trials.png'}")
 

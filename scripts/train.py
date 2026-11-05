@@ -61,6 +61,7 @@ def parse_args():
     parser.add_argument("--unfreeze_epoch", type=int, default=15, help="Epoch to unfreeze video backbone in staged fine-tuning")
     parser.add_argument("--unfreeze_lr", type=float, default=1e-5, help="Learning rate for unfrozen video backbone")
     parser.add_argument("--early_stopping_patience", type=int, default=0, help="Epochs without improvement before early stopping (0=disabled)")
+    parser.add_argument("--min_epochs", type=int, default=50, help="Minimum number of epochs to train before early stopping can trigger (default: 50)")
     parser.add_argument("--resume", type=str, default=None, help="Path to checkpoint to resume training from")
     parser.add_argument("--checkpoint_name", type=str, default=None, help="Custom filename for saved checkpoint")
     parser.add_argument("--output_dir", type=str, default="outputs", help="Directory for artifacts")
@@ -350,8 +351,11 @@ def main():
         else:
             patience_counter += 1
             if args.early_stopping_patience > 0 and patience_counter >= args.early_stopping_patience:
-                print(f"\n[Early Stopping] No improvement in validation F1 for {patience_counter} consecutive epochs. Stopping early at epoch {epoch}.")
-                break
+                if epoch < args.min_epochs:
+                    print(f"  [Early Stopping Deferred] Patience exceeded ({patience_counter} eps without improvement), but continuing to satisfy required --min_epochs {args.min_epochs} (Current: {epoch}).")
+                else:
+                    print(f"\n[Early Stopping] No improvement in validation F1 for {patience_counter} consecutive epochs and minimum {args.min_epochs} epochs completed. Stopping early at epoch {epoch}.")
+                    break
 
     total_training_time = time.time() - start_time
     chosen_ckpt = args.checkpoint_name or f"best_model_{args.video_backbone}.pth"

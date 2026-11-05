@@ -139,56 +139,128 @@ To ingest the genuine MMAct dataset:
 
 ## 6. How to Run
 
-### A. Run Unit Tests (16 Tests)
-Validates indexer pairing, label mapping, model architectures, preprocessing tensor shapes, and zero-leakage split verification:
+### A. Run Unit Tests (33 Tests)
+Validates indexer pairing, symlink traversal, label mapping, model architectures, preprocessing tensor shapes, zero-leakage split verification, hyperparameter tuning, and notebook structure:
 ```powershell
 & "C:\Users\chenn\AppData\Local\Programs\Python\Python311\python.exe" -m pytest tests -v
 ```
 
-### B. Train Model (`scripts/train.py`)
+### B. Hyperparameter Tuning (`scripts/tune.py`)
+Explores learning rate, weight decay, and dropout regularization strictly on train/val splits (test set remains strictly untouched):
+```powershell
+& "C:\Users\chenn\AppData\Local\Programs\Python\Python311\python.exe" scripts/tune.py `
+    --data_root data/genuine_mmact `
+    --split_strategy subject `
+    --epochs_per_trial 10 `
+    --batch_size 8 `
+    --output_dir outputs/tuning `
+    --plots_dir outputs/plots
+```
+Outputs:
+- Trial history: `outputs/tuning/tuning_history.json`, `outputs/tuning/tuning_history.csv`, `outputs/tuning/trial_epoch_histories.csv`
+- Best configuration: `outputs/tuning/best_hyperparameters.json`
+- Visualization: `outputs/plots/hyperparameter_trials.png`
 
-#### Pipeline Verification on Synthetic Fixture:
+### C. Train Models (`scripts/train.py`)
+
+#### 1. Pipeline Verification on Synthetic Smoke-Test:
 ```powershell
 & "C:\Users\chenn\AppData\Local\Programs\Python\Python311\python.exe" scripts/train.py --smoke_test --epochs 5 --batch_size 8
 ```
 
-#### Training on Genuine MMAct Data:
+#### 2. Improved Custom CNN Baseline (50 Epochs):
 ```powershell
 & "C:\Users\chenn\AppData\Local\Programs\Python\Python311\python.exe" scripts/train.py `
     --data_root data/genuine_mmact `
-    --epochs 50 `
-    --batch_size 16 `
-    --lr 0.0001 `
-    --split_strategy subject `
-    --video_backbone resnet18 `
+    --video_backbone cnn `
     --sensor_backbone inception_time `
-    --mode multimodal
+    --mode video_only `
+    --epochs 50 `
+    --min_epochs 50 `
+    --batch_size 8 `
+    --lr 0.0001 `
+    --weight_decay 0.001 `
+    --dropout 0.35 `
+    --split_strategy subject `
+    --early_stopping_patience 15 `
+    --checkpoint_name best_model_cnn.pth `
+    --output_dir outputs/baseline_cnn
 ```
 
-Key flags:
-- `--mode`: `multimodal` (default), `video_only`, `sensor_only`
-- `--split_strategy`: `subject` (default), `cross_view`, `cross_scene`, `session`
-- `--video_backbone`: `resnet18` (default), `lightweight`
-- `--sensor_backbone`: `inception_time` (default), `cnn1d`
-- `--freeze_video`: Freezes pretrained video backbone for fast sensor-focused fine-tuning
+#### 3. MobileNetV2 Staged Fine-Tuning (50 Epochs):
+```powershell
+& "C:\Users\chenn\AppData\Local\Programs\Python\Python311\python.exe" scripts/train.py `
+    --data_root data/genuine_mmact `
+    --video_backbone mobilenet_v2 `
+    --sensor_backbone inception_time `
+    --mode video_only `
+    --epochs 50 `
+    --min_epochs 50 `
+    --batch_size 8 `
+    --lr 0.0001 `
+    --weight_decay 0.0005 \\\
+    --dropout 0.35 `
+    --staged_finetune `
+    --unfreeze_epoch 15 `
+    --unfreeze_lr 0.00001 `
+    --split_strategy subject `
+    --early_stopping_patience 15 `
+    --checkpoint_name best_model_mobilenet_v2.pth `
+    --output_dir outputs/mobilenet_v2
+```
 
-Outputs:
-- Checkpoints: `outputs/checkpoints/best_model.pth`, `outputs/checkpoints/latest_model.pth`
-- Visualizations: `outputs/plots/training_curves.png`, `outputs/plots/val_confusion_matrix.png`, `outputs/plots/val_roc_ovr.png`, `outputs/plots/val_pr_curves.png`
-- Summary metadata: `outputs/training_summary.json`
+#### 4. Sensor-Only InceptionTime Baseline (50 Epochs):
+```powershell
+& "C:\Users\chenn\AppData\Local\Programs\Python\Python311\python.exe" scripts/train.py `
+    --data_root data/genuine_mmact `
+    --mode sensor_only `
+    --sensor_backbone inception_time `
+    --epochs 50 `
+    --min_epochs 50 `
+    --batch_size 8 `
+    --lr 0.0005 `
+    --weight_decay 0.0001 `
+    --split_strategy subject `
+    --checkpoint_name best_model_sensor.pth `
+    --output_dir outputs/sensor_only
+```
 
-### C. Standalone Evaluation (`scripts/evaluate.py`)
+#### 5. Multimodal Late Fusion (50 Epochs):
+```powershell
+& "C:\Users\chenn\AppData\Local\Programs\Python\Python311\python.exe" scripts/train.py `
+    --data_root data/genuine_mmact `
+    --mode multimodal `
+    --video_backbone mobilenet_v2 `
+    --sensor_backbone inception_time `
+    --epochs 50 `
+    --min_epochs 50 `
+    --batch_size 8 `
+    --lr 0.0001 `
+    --weight_decay 0.0005 `
+    --split_strategy subject `
+    --checkpoint_name best_model_multimodal.pth `
+    --output_dir outputs/multimodal_fusion
+```
+
+### D. Standalone Held-Out Test Evaluation (`scripts/evaluate.py`)
 Computes side-by-side performance metrics for **Multimodal (Fused)**, **Video-Only**, and **Sensor-Only** baselines:
 ```powershell
-& "C:\Users\chenn\AppData\Local\Programs\Python\Python311\python.exe" scripts/evaluate.py --checkpoint outputs/checkpoints/best_model.pth
+& "C:\Users\chenn\AppData\Local\Programs\Python\Python311\python.exe" scripts/evaluate.py `
+    --checkpoint outputs/multimodal_fusion/checkpoints/best_model_multimodal.pth `
+    --data_root data/genuine_mmact `
+    --output_file outputs/multimodal_fusion/metrics.json `
+    --plots_dir outputs/multimodal_fusion/plots
 ```
 Outputs:
-- Comprehensive metrics: `outputs/metrics.json`
-- Test confusion matrix: `outputs/plots/test_confusion_matrix.png`
-- Test One-vs-Rest ROC curves: `outputs/plots/test_roc_ovr.png`
-- Test Precision-Recall curves: `outputs/plots/test_pr_curves.png`
+- Comprehensive metrics: `metrics.json` and `metrics.csv`
+- Detailed sample predictions: `test_predictions.csv`
+- Test confusion matrix: `test_confusion_matrix.png`
+- Test One-vs-Rest ROC curves (with per-class, micro, and macro AUC): `test_roc_ovr.png`
+- Test Precision-Recall curves (with per-class, micro, and macro AP): `test_pr_curves.png`
+- Standalone per-class bar charts: `test_precision_bars.png`, `test_recall_bars.png`, `test_f1_bars.png`
+- Cross-modality ablation bar chart: `test_modality_ablation.png`
 
-### D. Single-Sample / Paired Inference (`scripts/infer.py`)
+### E. Single-Sample / Paired Inference (`scripts/infer.py`)
 
 #### 1. Multimodal Inference (Video + Sensors):
 ```powershell
@@ -196,64 +268,59 @@ Outputs:
     --video path/to/clip.mp4 `
     --sensor_phone path/to/acc_phone.csv `
     --sensor_watch path/to/acc_watch.csv `
-    --sensor_gyro path/to/gyro.csv
-```
-
-#### 2. Video-Only Inference:
-```powershell
-& "C:\Users\chenn\AppData\Local\Programs\Python\Python311\python.exe" scripts/infer.py --video path/to/clip.mp4
-```
-
-#### 3. Sensor-Only Inference:
-```powershell
-& "C:\Users\chenn\AppData\Local\Programs\Python\Python311\python.exe" scripts/infer.py `
-    --sensor_phone path/to/acc_phone.csv `
-    --sensor_watch path/to/acc_watch.csv `
-    --sensor_gyro path/to/gyro.csv
+    --sensor_gyro path/to/gyro.csv `
+    --checkpoint outputs/multimodal_fusion/checkpoints/best_model_multimodal.pth
 ```
 
 ---
 
-## 7. Model Architectures & CNN vs. MobileNetV2 Benchmark
-
-To address the student's previously reported overfitting discrepancy (97% training accuracy vs. 57% held-out test accuracy), our architecture pipeline introduces two complementary video encoders evaluated on identical multimodal splits:
+## 7. Model Architectures & Benchmark Suite
 
 ### A. Improved Custom CNN (Anti-Overfitting Regularization)
 - **Architecture**: 3-stage hierarchical 2D convolutional blocks with Spatial Dropout (`Dropout2d(0.15–0.20)`), Batch Normalization after every convolution, and Global Average Pooling per frame.
-- **Regularization**: High dropout ($p=0.40$), $L_2$ weight decay ($1\times 10^{-3}$), and early stopping patience.
+- **Regularization**: High temporal dropout ($p=0.35–0.40$), $L_2$ weight decay ($1\times 10^{-3}$), Cosine Annealing LR scheduling, and best validation checkpointing.
 - **Temporal Aggregation**: Concatenated temporal Mean + Max pooling across frame representations ($128 \times 2 = 256$ dims) projected to a 128-dim video embedding.
 
-### B. MobileNetV2 (Transfer Learning & Fine-Tuning)
+### B. MobileNetV2 (Transfer Learning & Staged Fine-Tuning)
 - **Architecture**: Inverted residual blocks with linear bottlenecks (`torchvision` ImageNet pretrained backbone with pure PyTorch fallback for zero-dependency execution).
-- **Transfer Strategy**: Generalizes feature extraction on spatial frames using pretrained ImageNet weights, avoiding overfitting on limited subject data.
-- **Temporal Aggregation**: 1280-dim frame representations pooled temporally (Mean + Max $\rightarrow 2560$ dims) and projected through regularized linear layers to a 128-dim video embedding.
+- **Staged Fine-Tuning Strategy**:
+  - Phase 1 (Epochs 1 to 15): Feature extraction backbone frozen (`requires_grad = False`), training projection and classification heads with LR $1\times 10^{-4}$.
+  - Phase 2 (Epochs 16 to 50): Entire backbone unfrozen with differential learning rates (backbone LR $1\times 10^{-5}$, classification heads LR $1\times 10^{-4}$).
 
-### C. Multimodal Fusion
-Both encoders feed into the shared multimodal fusion head, concatenated with the 128-dim **InceptionTime** multi-scale 1D convolutional sensor feature extractor ($128 + 128 = 256$ dims) $\rightarrow$ Dropout ($0.30$) $\rightarrow$ Linear ($128$) $\rightarrow$ BatchNorm1d $\rightarrow$ ReLU $\rightarrow$ Dropout ($0.30$) $\rightarrow$ Linear ($10$ classes).
+### C. InceptionTime Sensor Encoder & Multimodal Late Fusion
+- **Sensor Branch**: Multi-scale 1D InceptionTime modules (kernel sizes 9, 19, 39, residual shortcuts) extracting temporal dynamics across 9 inertial channels (`acc_phone`, `acc_watch`, `gyro`).
+- **Multimodal Fusion**: Concatenates 128-dim video embedding and 128-dim sensor embedding ($256$ dims) $\rightarrow$ Dropout ($0.35$) $\rightarrow$ Linear ($128$) $\rightarrow$ BatchNorm1d $\rightarrow$ ReLU $\rightarrow$ Dropout ($0.35$) $\rightarrow$ Linear ($10$ classes).
 
 ---
 
 ## 8. Kaggle Cloud GPU Execution
 
-A ready-to-run, self-contained Jupyter notebook is provided at [`notebooks/kaggle_mmact_har.ipynb`](notebooks/kaggle_mmact_har.ipynb).
+For seamless cloud execution on Kaggle GPU, a separate updated notebook is available:
+- **Primary 50-Epoch Benchmark Notebook**: [`notebooks/kaggle_mmact_har_benchmark_50ep.ipynb`](notebooks/kaggle_mmact_har_benchmark_50ep.ipynb)
+- **Standard Pipeline Notebook**: [`notebooks/kaggle_mmact_har.ipynb`](notebooks/kaggle_mmact_har.ipynb)
 
-### Kaggle Setup:
-1. **Upload Notebook:** Upload `notebooks/kaggle_mmact_har.ipynb` to Kaggle.
-2. **Attach Dataset:** Click **+ Add Input** in the top right to attach your uploaded MMAct dataset (`mmact-trimmed`). Supports extracted directory structures or nested ZIP archives.
-3. **Configure Settings:**
-   - **Accelerator:** `GPU T4 x2` or `GPU P100` (Settings sidebar -> Accelerator)
-   - **Internet:** `On` (Settings sidebar -> Internet)
-4. **Execution Flow:**
-   - **Step 1**: Verifies CUDA GPU environment (`nvidia-smi`, compute capability).
-   - **Step 2**: Clones/updates `HAR-MMAct` into `/kaggle/working/HAR-MMAct`, configures `sys.path.insert(0, str(PROJECT_ROOT))`, and installs dependencies with `--prefer-binary`.
-   - **Step 3**: Deeply inspects `/kaggle/input`, discovers extracted or nested ZIP files, and sets up `data/genuine_mmact/trimmed/`.
-   - **Step 4**: Pre-flight validation verifying video, sensor, split isolation, and 10-class coverage.
-   - **Step 5**: Trains Model A (**Improved Custom CNN**) for 50 epochs (or configurable count).
-   - **Step 6**: Trains Model B (**MobileNetV2 Transfer Learning**) for 50 epochs.
-   - **Step 7**: Evaluates both models on the held-out subject-independent test split, generating comparison tables.
-   - **Step 8**: Renders all plots inline (loss curves, accuracy curves, confusion matrices, ROC/PR curves, per-class metrics, and the CNN vs. MobileNetV2 accuracy comparison).
-   - **Step 9**: Interactive multimodal inference demo.
-   - **Step 10**: Packages all outputs into `/kaggle/working/mmact_benchmark_results.zip` for instant one-click download.
+Both notebooks run completely top-to-bottom without manual intervention:
+1. **Upload Notebook to Kaggle**: Import `notebooks/kaggle_mmact_har_benchmark_50ep.ipynb` as a new Kaggle Notebook.
+2. **Configure Session Options**:
+   - **Accelerator**: `GPU T4 x2` or `GPU P100`
+   - **Internet**: `On` (required to sync repository and pretrained weights)
+3. **Attach MMAct Dataset**:
+   - Click **+ Add Input** in the top right.
+   - Attach your uploaded MMAct dataset (e.g. `mmact-trimmed`).
+4. **Automated Pipeline Steps**:
+   - **Step 1**: CUDA GPU diagnostics and memory verification.
+   - **Step 2**: Clones/updates `master` branch and verifies NumPy/Pandas C ABI preservation (`requirements-kaggle.txt`).
+   - **Step 3**: Discovers and ingests all video subjects, sensor modalities, and split files across all attached inputs (following symlinks with recursion loop protection).
+   - **Step 4**: Pre-flight readability audit (decoding sample video frame, parsing sensor CSV, verifying split isolation with zero leakage).
+   - **Step 5**: Preprocessing & tensor caching warm-up.
+   - **Step 6**: Experiment 1 – Custom CNN Baseline (50 epochs, spatial dropout, batchnorm, weight decay).
+   - **Step 7**: Experiment 2 – Hyperparameter Tuning (train/val only) & Tuned CNN (50 epochs on optimal configuration).
+   - **Step 8**: Experiment 3 – MobileNetV2 Staged Fine-Tuning (50 epochs: 15 epochs frozen -> 35 epochs unfrozen).
+   - **Step 9**: Experiment 4 & 5 – Sensor-Only InceptionTime (50 epochs) & Multimodal Late Fusion (50 epochs).
+   - **Step 10**: Standalone held-out test evaluation across all 5 models.
+   - **Step 11**: Generation and display of all publication plots and comparison galleries.
+   - **Step 12**: Interactive sample multimodal inference demo.
+   - **Step 13**: Consolidated results summary table and 1-click artifact packaging (`har_mmact_results.zip`).
 
 ---
 
