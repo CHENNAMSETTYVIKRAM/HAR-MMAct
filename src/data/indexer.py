@@ -12,7 +12,7 @@ import os
 import re
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Dict, List, Optional, Set, Tuple
+from typing import Any, Dict, List, Optional, Set, Tuple
 
 from src.config import (
     VERIFIED_TARGET_CLASSES,
@@ -215,6 +215,31 @@ class MMActIndexer:
             return (sensor_type, subj, scene, session, action)
         return None
 
+    @staticmethod
+    def find_files_recursively(root: Path, extensions: Set[str]) -> List[Path]:
+        """Find all files with matching extensions, safely traversing symlinks with cycle protection."""
+        results: List[Path] = []
+        root_path = Path(root)
+        if not root_path.exists():
+            return results
+        visited_dirs: Set[Any] = set()
+        for dirpath, dirnames, filenames in os.walk(str(root_path), followlinks=True):
+            try:
+                st = os.stat(dirpath)
+                dir_key = (st.st_dev, st.st_ino)
+            except OSError:
+                dir_key = os.path.realpath(dirpath)
+            if dir_key in visited_dirs:
+                dirnames.clear()
+                continue
+            visited_dirs.add(dir_key)
+
+            for fname in filenames:
+                ext = os.path.splitext(fname)[1].lower()
+                if ext in extensions:
+                    results.append(Path(dirpath) / fname)
+        return results
+
     def index(self) -> IndexerReport:
         """Scan directory and produce paired dataset report."""
         report = IndexerReport()
@@ -222,9 +247,9 @@ class MMActIndexer:
         if not self.dataset_root.exists():
             return report
 
-        # 1. Discover all videos
+        # 1. Discover all videos (safely traversing symlinks)
         video_map: Dict[Tuple[str, str, str, str, str], Path] = {}
-        for vid_file in self.dataset_root.glob("**/*.mp4"):
+        for vid_file in self.find_files_recursively(self.dataset_root, {".mp4"}):
             report.total_video_files_found += 1
             parsed = self.parse_video_path(vid_file)
             if not parsed:
@@ -249,24 +274,30 @@ class MMActIndexer:
         sensor_files: List[Path] = []
         possible_sensor_roots = [
             self.dataset_root / "trimmed" / "sensors",
+            self.dataset_root / "trimmed" / "sensor",
             self.dataset_root / "sensors",
-            self.dataset_root,
+            self.dataset_root / "sensor",
+            self.dataset_root / "trimmed_sensor",
         ]
         scanned_targeted = False
         for s_root in possible_sensor_roots:
             if s_root.exists() and s_root != self.dataset_root:
                 scanned_targeted = True
+                for sub_child in [s_root / "sensor", s_root / "sensors"]:
+                    if sub_child.is_dir():
+                        s_root = sub_child
+                        break
                 for clip_dir in s_root.iterdir():
                     if clip_dir.is_dir():
                         for v_subj in video_subjects:
                             target_s_dir = clip_dir / v_subj
                             if target_s_dir.exists():
-                                for sen_file in target_s_dir.rglob("*.csv"):
+                                for sen_file in self.find_files_recursively(target_s_dir, {".csv"}):
                                     sensor_files.append(sen_file)
                 break
 
         if not scanned_targeted or len(sensor_files) == 0:
-            sensor_files = list(self.dataset_root.glob("**/*.csv"))
+            sensor_files = self.find_files_recursively(self.dataset_root, {".csv"})
 
         for sen_file in sensor_files:
             report.total_sensor_files_found += 1

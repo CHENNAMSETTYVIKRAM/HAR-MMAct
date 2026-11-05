@@ -2,6 +2,7 @@
 test_indexer.py - Tests for multimodal dataset indexing and diagnostic anomaly reporting
 """
 
+import os
 from pathlib import Path
 import pytest
 
@@ -49,3 +50,20 @@ def test_indexer_handles_nonexistent_dir(tmp_path):
     report = indexer.index()
     assert report.paired_samples_count == 0
     assert report.total_video_files_found == 0
+
+
+def test_indexer_traverses_symlinks(synthetic_dataset_dir, tmp_path):
+    symlink_root = tmp_path / "symlinked_root"
+    symlink_root.mkdir()
+    target_link = symlink_root / "trimmed"
+    try:
+        os.symlink(synthetic_dataset_dir / "trimmed", target_link, target_is_directory=True)
+    except OSError:
+        pytest.skip("Symlink creation not permitted in this environment")
+
+    indexer = MMActIndexer(dataset_root=symlink_root)
+    report = indexer.index()
+    assert report.total_video_files_found > 0
+    assert report.total_sensor_files_found > 0
+    assert report.paired_samples_count == 120
+
