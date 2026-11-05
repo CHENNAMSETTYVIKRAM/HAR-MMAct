@@ -10,6 +10,7 @@ Supports multimodal fusion, video-only, and sensor-only training with:
 """
 
 import argparse
+import csv
 import json
 import os
 import sys
@@ -34,10 +35,12 @@ from src.utils.plots import (
     plot_training_curves,
     plot_loss_curve_standalone,
     plot_accuracy_curve_standalone,
+    plot_train_eval_annotated,
     plot_confusion_matrix,
     plot_multiclass_roc,
     plot_multiclass_pr,
     plot_per_class_metrics,
+    plot_per_class_metric_bars,
 )
 
 
@@ -48,11 +51,15 @@ def parse_args():
     parser.add_argument("--batch_size", type=int, default=8, help="Batch size")
     parser.add_argument("--lr", type=float, default=1e-4, help="Learning rate")
     parser.add_argument("--weight_decay", type=float, default=1e-4, help="Weight decay")
+    parser.add_argument("--dropout", type=float, default=0.35, help="Dropout probability")
     parser.add_argument("--split_strategy", type=str, default="subject", choices=["subject", "cross_view", "cross_scene", "session"], help="Split strategy")
     parser.add_argument("--mode", type=str, default="multimodal", choices=["multimodal", "video_only", "sensor_only"], help="Model mode")
     parser.add_argument("--video_backbone", type=str, default="cnn", choices=["cnn", "custom_cnn", "mobilenet_v2", "resnet18", "lightweight"], help="Video backbone")
     parser.add_argument("--sensor_backbone", type=str, default="inception_time", choices=["inception_time", "cnn1d"], help="Sensor backbone")
     parser.add_argument("--freeze_video", action="store_true", help="Freeze video backbone feature extractor")
+    parser.add_argument("--staged_finetune", action="store_true", help="Enable staged fine-tuning for transfer learning (frozen head first, then unfreeze backbone)")
+    parser.add_argument("--unfreeze_epoch", type=int, default=15, help="Epoch to unfreeze video backbone in staged fine-tuning")
+    parser.add_argument("--unfreeze_lr", type=float, default=1e-5, help="Learning rate for unfrozen video backbone")
     parser.add_argument("--early_stopping_patience", type=int, default=0, help="Epochs without improvement before early stopping (0=disabled)")
     parser.add_argument("--resume", type=str, default=None, help="Path to checkpoint to resume training from")
     parser.add_argument("--checkpoint_name", type=str, default=None, help="Custom filename for saved checkpoint")
@@ -212,6 +219,11 @@ def main():
         print(f"  - Initial Allocated Mem: {torch.cuda.memory_allocated(0) / (1024**2):.2f} MB")
     else:
         print(f"\n[Step 4] Initializing MultimodalHARModel on device: {device} (CUDA not available, running on CPU)")
+
+    freeze_video = args.freeze_video or args.staged_finetune
+    if args.staged_finetune:
+        print(f"\n[Staged Fine-Tuning Active] Backbone frozen for epochs 1 to {args.unfreeze_epoch - 1}. Will unfreeze at epoch {args.unfreeze_epoch} with LR={args.unfreeze_lr}.")
+
     model = MultimodalHARModel(
         num_classes=len(VERIFIED_TARGET_CLASSES),
         video_channels=3,
@@ -219,13 +231,13 @@ def main():
         video_embed_dim=128,
         sensor_embed_dim=128,
         fusion_hidden_dim=128,
-        dropout=0.3,
+        dropout=args.dropout,
         mode=args.mode,
         video_backbone=args.video_backbone,
         sensor_backbone=args.sensor_backbone,
         pretrained_video=True,
         pretrained_path="outputs/pretrained/resnet18.pth",
-        freeze_video_backbone=args.freeze_video,
+        freeze_video_backbone=freeze_video,
     ).to(device)
 
     total_params = sum(p.numel() for p in model.parameters())
@@ -266,6 +278,22 @@ def main():
     best_metrics = None
 
     for epoch in range(start_epoch, args.epochs + 1):
+        # Handle staged fine-tuning transition
+        if args.staged_finetune and epoch == args.unfreeze_epoch:
+            print(f"\n>>> [Staged Fine-Tuning Transition] Epoch {epoch}: Unfreezing video backbone with LR={args.unfreeze_lr}...")
+            if hasattr(model, "video_branch") and hasattr(model.video_branch, "backbone"):
+                for p in model.video_branch.backbone.parameters():
+                    p.requires_grad = True
+                backbone_params = list(model.video_branch.backbone.parameters())
+                backbone_ids = set(id(p) for p in backbone_params)
+                head_params = [p for p in model.parameters() if id(p) not in backbone_ids and p.requires_grad]
+                optimizer = torch.optim.AdamW([
+                    {"params": backbone_params, "lr": args.unfreeze_lr, "weight_decay": args.weight_decay},
+                    {"params": head_params, "lr": args.lr, "weight_decay": args.weight_decay},
+                ])
+                scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=max(1, args.epochs - epoch + 1), eta_min=1e-6)
+                print(f"    Backbone unfrozen ({sum(p.numel() for p in backbone_params):,} params @ lr={args.unfreeze_lr}), Heads @ lr={args.lr}")
+
         epoch_start = time.time()
         train_loss, train_acc = train_one_epoch(model, train_loader, criterion, optimizer, device, args.mode)
         val_metrics, val_labels, val_probs = evaluate(model, val_loader, criterion, device, args.mode, VERIFIED_TARGET_CLASSES)
@@ -384,6 +412,26 @@ def main():
         num_layers=4,
     )
 
+    # Annotated curves matching publication standards (with final values)
+    plot_train_eval_annotated(
+        history["train_acc"],
+        history["val_acc"],
+        plots_dir / f"train_vs_val_accuracy_annotated_{args.video_backbone}.png",
+        metric_name="Accuracy",
+        eval_label="Validation",
+        epochs_label=args.epochs,
+        as_percent=True,
+    )
+    plot_train_eval_annotated(
+        history["train_loss"],
+        history["val_loss"],
+        plots_dir / f"train_vs_val_loss_annotated_{args.video_backbone}.png",
+        metric_name="Loss",
+        eval_label="Validation",
+        epochs_label=args.epochs,
+        as_percent=False,
+    )
+
     if best_metrics and "confusion_matrix" in best_metrics:
         cm_array = np.array(best_metrics["confusion_matrix"])
         title = f"Val Confusion Matrix - {args.video_backbone.upper()} ({args.split_strategy} split)"
@@ -403,8 +451,42 @@ def main():
             model_name=args.video_backbone.upper(),
             split_name=f"Validation ({args.split_strategy})",
         )
+        # Standalone per-class bar charts
+        plot_per_class_metric_bars(
+            best_metrics["per_class"],
+            "Precision",
+            plots_dir / f"val_precision_bars_{args.video_backbone}.png",
+            model_name=args.video_backbone.upper(),
+            split_name=f"Val ({args.split_strategy})",
+        )
+        plot_per_class_metric_bars(
+            best_metrics["per_class"],
+            "Recall",
+            plots_dir / f"val_recall_bars_{args.video_backbone}.png",
+            model_name=args.video_backbone.upper(),
+            split_name=f"Val ({args.split_strategy})",
+        )
+        plot_per_class_metric_bars(
+            best_metrics["per_class"],
+            "F1-Score",
+            plots_dir / f"val_f1_bars_{args.video_backbone}.png",
+            model_name=args.video_backbone.upper(),
+            split_name=f"Val ({args.split_strategy})",
+        )
 
-    # 7. Save history and summary JSON
+    # 7. Save history and summary JSON + CSV
+    csv_path = output_dir / f"history_{args.video_backbone}.csv"
+    with open(csv_path, "w", newline="") as f:
+        writer = csv.writer(f)
+        writer.writerow(["epoch", "train_loss", "val_loss", "train_acc", "val_acc"])
+        for i in range(len(history["train_loss"])):
+            writer.writerow([
+                i + 1,
+                round(history["train_loss"][i], 4),
+                round(history["val_loss"][i], 4),
+                round(history["train_acc"][i], 2),
+                round(history["val_acc"][i], 2),
+            ])
     summary = {
         "dataset_root": str(data_path),
         "is_synthetic": is_synthetic,

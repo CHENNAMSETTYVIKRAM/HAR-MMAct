@@ -5,7 +5,7 @@ plots.py - Visualization utilities for training curves, confusion matrices, and 
 import os
 import tempfile
 from pathlib import Path
-from typing import Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional, Union
 import numpy as np
 
 # Ensure headless matplotlib without cache warning
@@ -386,6 +386,260 @@ def plot_per_class_metrics(
     ax.set_ylim([0, 105])
     ax.legend(loc="upper right")
     ax.grid(axis="y", linestyle="--", alpha=0.6)
+
+    fig.tight_layout()
+    plt.savefig(output_path, dpi=200, bbox_inches="tight")
+    plt.close(fig)
+
+
+def plot_train_eval_annotated(
+    train_values: List[float],
+    eval_values: List[float],
+    output_path: Union[str, Path],
+    metric_name: str = "Accuracy",
+    eval_label: str = "Test",
+    epochs_label: Optional[int] = None,
+    as_percent: bool = True,
+) -> None:
+    """
+    Renders styled epoch curve with final annotations and high-contrast styling
+    matching publication standards (e.g., Train Accuracy vs Test Accuracy (50 Epochs)).
+    """
+    output_path = Path(output_path)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+
+    n_epochs = len(train_values)
+    num_ep = epochs_label if epochs_label is not None else n_epochs
+    epochs = list(range(1, n_epochs + 1))
+
+    # Scale to percentage if requested and values are [0, 1]
+    t_vals = [v * 100.0 if (as_percent and max(train_values or [0.0]) <= 1.0) else v for v in train_values]
+    e_vals = [v * 100.0 if (as_percent and max(eval_values or [0.0]) <= 1.0) else v for v in eval_values]
+
+    fig, ax = plt.subplots(figsize=(8.5, 5))
+    ax.plot(epochs, t_vals, label=f"Train {metric_name}", color="#1a365d", lw=2.2, marker="o", markersize=3.5)
+    ax.plot(epochs, e_vals, label=f"{eval_label} {metric_name}", color="#c53030", lw=2.2, marker="s", markersize=3.5)
+
+    unit_str = " (%)" if as_percent else ""
+    ax.set_title(f"Train {metric_name} vs {eval_label} {metric_name} ({num_ep} Epochs)", fontsize=12, fontweight="bold")
+    ax.set_xlabel("Epochs", fontsize=11, fontweight="semibold")
+    ax.set_ylabel(f"{metric_name}{unit_str}", fontsize=11, fontweight="semibold")
+    ax.legend(loc="lower right" if metric_name.lower() == "accuracy" else "upper right", frameon=True, fancybox=True, shadow=True)
+    ax.grid(True, which="both", color="#e2e8f0", linestyle="-", linewidth=0.8)
+
+    # Annotate final values
+    if n_epochs > 0:
+        final_t = t_vals[-1]
+        final_e = e_vals[-1]
+        fmt = ".1f" if as_percent else ".4f"
+        pct = "%" if as_percent else ""
+        t_offset = (max(t_vals) - min(t_vals)) * 0.15 if max(t_vals) != min(t_vals) else 1.0
+        e_offset = (max(e_vals) - min(e_vals)) * 0.25 if max(e_vals) != min(e_vals) else 2.0
+        ax.annotate(
+            f"Final Train: {final_t:{fmt}}{pct}",
+            xy=(epochs[-1], final_t),
+            xytext=(max(1, epochs[-1] - max(1, n_epochs // 5)), final_t - t_offset),
+            arrowprops=dict(facecolor="#1a365d", shrink=0.08, width=1, headwidth=5),
+            fontsize=9,
+            fontweight="bold",
+            color="#1a365d",
+        )
+        ax.annotate(
+            f"Final {eval_label}: {final_e:{fmt}}{pct}",
+            xy=(epochs[-1], final_e),
+            xytext=(max(1, epochs[-1] - max(1, n_epochs // 5)), final_e - e_offset),
+            arrowprops=dict(facecolor="#c53030", shrink=0.08, width=1, headwidth=5),
+            fontsize=9,
+            fontweight="bold",
+            color="#c53030",
+        )
+
+    fig.tight_layout()
+    plt.savefig(output_path, dpi=200, bbox_inches="tight")
+    plt.close(fig)
+
+
+def plot_per_class_metric_bars(
+    per_class_dict: Dict[str, Dict[str, float]],
+    metric_name: str,
+    output_path: Union[str, Path],
+    model_name: str = "Model",
+    split_name: str = "Held-Out Test Split",
+) -> None:
+    """
+    Renders a standalone bar chart for a single per-class metric (Precision, Recall, or F1-Score)
+    with numeric data labels on top of each bar.
+    """
+    output_path = Path(output_path)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+
+    metric_key = metric_name.lower().replace("-", "").replace("score", "").strip()
+    if "f1" in metric_key:
+        metric_key = "f1"
+    elif "prec" in metric_key:
+        metric_key = "precision"
+    elif "rec" in metric_key:
+        metric_key = "recall"
+
+    classes = list(per_class_dict.keys())
+    scores = [per_class_dict[c].get(metric_key, 0.0) * 100.0 for c in classes]
+
+    palette = {
+        "precision": "#2b6cb0",
+        "recall": "#2f855a",
+        "f1": "#c05621",
+    }
+    bar_color = palette.get(metric_key, "#4a5568")
+
+    fig, ax = plt.subplots(figsize=(10, 5))
+    bars = ax.bar(classes, scores, color=bar_color, width=0.55, edgecolor="#1a202c", linewidth=0.8)
+
+    ax.set_ylabel(f"{metric_name} (%)", fontsize=10, fontweight="semibold")
+    ax.set_title(f"Per-Class {metric_name}: {model_name} ({split_name})", fontsize=11, fontweight="bold")
+    ax.set_xticks(range(len(classes)))
+    ax.set_xticklabels(classes, rotation=35, ha="right", fontsize=9)
+    ax.set_ylim([0, 110])
+    ax.grid(axis="y", linestyle="--", alpha=0.6)
+
+    for bar in bars:
+        h = bar.get_height()
+        ax.annotate(
+            f"{h:.1f}%",
+            xy=(bar.get_x() + bar.get_width() / 2, h),
+            xytext=(0, 3),
+            textcoords="offset points",
+            ha="center",
+            va="bottom",
+            fontsize=8,
+            fontweight="bold",
+        )
+
+    fig.tight_layout()
+    plt.savefig(output_path, dpi=200, bbox_inches="tight")
+    plt.close(fig)
+
+
+def plot_cross_model_comparison(
+    models_metrics_dict: Dict[str, Dict[str, float]],
+    output_path: Union[str, Path],
+    split_name: str = "Held-Out Test Split",
+) -> None:
+    """
+    Renders a multi-model comparative bar chart across key evaluation metrics:
+    Accuracy, Macro Precision, Macro Recall, Macro F1.
+    """
+    output_path = Path(output_path)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+
+    model_names = list(models_metrics_dict.keys())
+    metric_keys = ["accuracy", "macro_precision", "macro_recall", "macro_f1"]
+    display_names = ["Accuracy", "Macro Precision", "Macro Recall", "Macro F1"]
+
+    x = np.arange(len(model_names))
+    width = 0.2
+    colors = ["#2b6cb0", "#319795", "#38a169", "#dd6b20"]
+
+    fig, ax = plt.subplots(figsize=(11, 5.5))
+    for i, (k, disp) in enumerate(zip(metric_keys, display_names)):
+        vals = [models_metrics_dict[m].get(k, 0.0) * 100.0 for m in model_names]
+        bars = ax.bar(x + (i - 1.5) * width, vals, width, label=disp, color=colors[i], edgecolor="#1a202c", linewidth=0.5)
+        for bar in bars:
+            h = bar.get_height()
+            if h > 0:
+                ax.annotate(f"{h:.1f}", xy=(bar.get_x() + bar.get_width() / 2, h),
+                            xytext=(0, 2), textcoords="offset points", ha="center", va="bottom", fontsize=7)
+
+    ax.set_ylabel("Score (%)", fontsize=10, fontweight="semibold")
+    ax.set_title(f"Model Benchmark Comparison ({split_name})", fontsize=12, fontweight="bold")
+    ax.set_xticks(x)
+    ax.set_xticklabels(model_names, rotation=20, ha="right", fontsize=9, fontweight="semibold")
+    ax.set_ylim([0, 110])
+    ax.legend(loc="upper left", frameon=True)
+    ax.grid(axis="y", linestyle="--", alpha=0.6)
+
+    fig.tight_layout()
+    plt.savefig(output_path, dpi=200, bbox_inches="tight")
+    plt.close(fig)
+
+
+def plot_modality_ablation(
+    ablation_dict: Dict[str, Dict[str, float]],
+    output_path: Union[str, Path],
+    split_name: str = "Held-Out Test Split",
+) -> None:
+    """
+    Renders cross-modality ablation comparison chart:
+    Video-Only vs Sensor-Only vs Multimodal Fusion.
+    """
+    output_path = Path(output_path)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+
+    modalities = list(ablation_dict.keys())
+    accs = [ablation_dict[m].get("accuracy", 0.0) * 100.0 for m in modalities]
+    f1s = [ablation_dict[m].get("macro_f1", 0.0) * 100.0 for m in modalities]
+
+    x = np.arange(len(modalities))
+    width = 0.35
+
+    fig, ax = plt.subplots(figsize=(8, 5))
+    rects1 = ax.bar(x - width / 2, accs, width, label="Test Accuracy (%)", color="#2b6cb0", edgecolor="#1a202c", linewidth=0.8)
+    rects2 = ax.bar(x + width / 2, f1s, width, label="Macro F1 (%)", color="#dd6b20", edgecolor="#1a202c", linewidth=0.8)
+
+    ax.set_ylabel("Score (%)", fontsize=10, fontweight="semibold")
+    ax.set_title(f"Modality Ablation: Video vs Sensor vs Multimodal Fusion ({split_name})", fontsize=11, fontweight="bold")
+    ax.set_xticks(x)
+    ax.set_xticklabels(modalities, fontsize=10, fontweight="semibold")
+    ax.set_ylim([0, 110])
+    ax.legend(loc="upper left")
+    ax.grid(axis="y", linestyle="--", alpha=0.6)
+
+    for rect in list(rects1) + list(rects2):
+        h = rect.get_height()
+        ax.annotate(f"{h:.1f}%", xy=(rect.get_x() + rect.get_width() / 2, h),
+                    xytext=(0, 3), textcoords="offset points", ha="center", va="bottom", fontsize=8, fontweight="bold")
+
+    fig.tight_layout()
+    plt.savefig(output_path, dpi=200, bbox_inches="tight")
+    plt.close(fig)
+
+
+def plot_hyperparameter_trials(
+    trials_list: List[Dict[str, Any]],
+    output_path: Union[str, Path],
+) -> None:
+    """
+    Renders validation accuracy across hyperparameter tuning trials with parameter annotations.
+    """
+    output_path = Path(output_path)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+
+    trial_labels = [f"Trial {t.get('trial_id', i+1)}" for i, t in enumerate(trials_list)]
+    val_accs = [t.get("val_accuracy", 0.0) * 100.0 if t.get("val_accuracy", 0.0) <= 1.0 else t.get("val_accuracy", 0.0) for t in trials_list]
+
+    fig, ax = plt.subplots(figsize=(9, 5))
+    bars = ax.bar(trial_labels, val_accs, color="#4c51bf", width=0.5, edgecolor="#1a202c", linewidth=0.8)
+
+    ax.set_ylabel("Validation Accuracy (%)", fontsize=10, fontweight="semibold")
+    ax.set_title("Hyperparameter Tuning: Trial Comparison (Validation Set)", fontsize=11, fontweight="bold")
+    ax.set_ylim([0, 110])
+    ax.grid(axis="y", linestyle="--", alpha=0.6)
+
+    for bar, trial in zip(bars, trials_list):
+        h = bar.get_height()
+        lr_s = f"lr={trial.get('lr', 'N/A')}"
+        wd_s = f"wd={trial.get('weight_decay', 'N/A')}"
+        dp_s = f"drop={trial.get('dropout', 'N/A')}"
+        desc = f"{h:.1f}%\n({lr_s}\n{wd_s}\n{dp_s})"
+        ax.annotate(
+            desc,
+            xy=(bar.get_x() + bar.get_width() / 2, h),
+            xytext=(0, 4),
+            textcoords="offset points",
+            ha="center",
+            va="bottom",
+            fontsize=8,
+            fontweight="semibold",
+        )
 
     fig.tight_layout()
     plt.savefig(output_path, dpi=200, bbox_inches="tight")

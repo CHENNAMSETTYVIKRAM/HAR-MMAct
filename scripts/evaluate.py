@@ -10,6 +10,7 @@ and generates publication-ready visualization artifacts.
 """
 
 import argparse
+import csv
 import json
 import os
 import sys
@@ -33,6 +34,8 @@ from src.utils.plots import (
     plot_multiclass_roc,
     plot_multiclass_pr,
     plot_per_class_metrics,
+    plot_per_class_metric_bars,
+    plot_modality_ablation,
 )
 
 
@@ -190,6 +193,44 @@ def main():
         json.dump(results, f, indent=2)
     print(f"\nSaved complete metrics to: {output_path}")
 
+    # Save metrics CSV summary table
+    csv_metrics_path = output_path.parent / "metrics.csv"
+    with open(csv_metrics_path, "w", newline="") as f:
+        writer = csv.writer(f)
+        writer.writerow(["Model", "Modality", "Split", "Accuracy (%)", "Macro F1", "Macro Precision", "Macro Recall"])
+        for mod_name, m_dict in [("Multimodal (Fused)", mm_metrics), ("Video-Only", vo_metrics), ("Sensor-Only", so_metrics)]:
+            writer.writerow([
+                saved_cfg.get("video_backbone", "model"),
+                mod_name,
+                eval_split_name,
+                round(m_dict.get("accuracy", 0.0) * 100.0, 2),
+                round(m_dict.get("macro_f1", 0.0), 4),
+                round(m_dict.get("macro_precision", 0.0), 4),
+                round(m_dict.get("macro_recall", 0.0), 4),
+            ])
+    print(f"Saved metrics CSV table to: {csv_metrics_path}")
+
+    # Save test predictions CSV (sample_idx, ground_truth, predicted, confidence, probabilities)
+    if y_true is not None and mm_probs is not None:
+        preds_path = output_path.parent / "test_predictions.csv"
+        pred_labels = np.argmax(mm_probs, axis=-1)
+        confidences = np.max(mm_probs, axis=-1)
+        with open(preds_path, "w", newline="") as f:
+            writer = csv.writer(f)
+            header = ["sample_idx", "ground_truth", "predicted", "confidence"] + [f"prob_{c}" for c in classes]
+            writer.writerow(header)
+            for idx in range(len(y_true)):
+                gt_idx = int(y_true[idx])
+                pl_idx = int(pred_labels[idx])
+                row = [
+                    idx,
+                    classes[gt_idx] if gt_idx < len(classes) else str(gt_idx),
+                    classes[pl_idx] if pl_idx < len(classes) else str(pl_idx),
+                    round(float(confidences[idx]), 4),
+                ] + [round(float(p), 4) for p in mm_probs[idx]]
+                writer.writerow(row)
+        print(f"Saved test predictions table to: {preds_path}")
+
     # Generate plots
     plots_dir = Path(args.plots_dir)
     plots_dir.mkdir(parents=True, exist_ok=True)
@@ -216,7 +257,39 @@ def main():
             model_name=video_bb.upper(),
             split_name=f"Test ({split_strategy} split)",
         )
-        print(f"Saved per-class metrics plot to: {plots_dir / f'test_per_class_{video_bb}.png'}")
+        # Standalone per-class Precision, Recall, and F1-score bar charts
+        plot_per_class_metric_bars(
+            mm_metrics["per_class"],
+            "Precision",
+            plots_dir / f"test_precision_bars_{video_bb}.png",
+            model_name=video_bb.upper(),
+            split_name=f"Test ({split_strategy} split)",
+        )
+        plot_per_class_metric_bars(
+            mm_metrics["per_class"],
+            "Recall",
+            plots_dir / f"test_recall_bars_{video_bb}.png",
+            model_name=video_bb.upper(),
+            split_name=f"Test ({split_strategy} split)",
+        )
+        plot_per_class_metric_bars(
+            mm_metrics["per_class"],
+            "F1-Score",
+            plots_dir / f"test_f1_bars_{video_bb}.png",
+            model_name=video_bb.upper(),
+            split_name=f"Test ({split_strategy} split)",
+        )
+        print(f"Saved per-class metrics bar charts to: {plots_dir}")
+
+    # Modality ablation comparison plot
+    ablation_dict = {
+        "Video-Only": vo_metrics,
+        "Sensor-Only": so_metrics,
+        "Multimodal": mm_metrics,
+    }
+    plot_modality_ablation(ablation_dict, plots_dir / f"test_modality_ablation_{video_bb}.png", split_name=f"Test ({split_strategy} split)")
+    plot_modality_ablation(ablation_dict, plots_dir / "test_modality_ablation.png", split_name=f"Test ({split_strategy} split)")
+    print(f"Saved modality ablation plot to: {plots_dir / 'test_modality_ablation.png'}")
 
 
 if __name__ == "__main__":
