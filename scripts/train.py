@@ -27,7 +27,7 @@ from torch.utils.data import DataLoader
 
 from src.config import ProjectConfig, SplitConfig, set_seed, VERIFIED_TARGET_CLASSES
 from src.data.indexer import MMActIndexer
-from src.data.splits import DatasetSplitter, verify_split_isolation
+from src.data.splits import DatasetSplitter, verify_split_isolation, verify_split_representation
 from src.data.dataset import MMActMultimodalDataset
 from src.models.fusion_model import MultimodalHARModel
 from src.utils.metrics import compute_classification_metrics
@@ -41,6 +41,8 @@ from src.utils.plots import (
     plot_multiclass_pr,
     plot_per_class_metrics,
     plot_per_class_metric_bars,
+    plot_learning_rate_curve,
+    plot_generalization_gap,
 )
 
 
@@ -61,9 +63,26 @@ def parse_args():
     parser.add_argument("--lr", type=float, default=1e-4, help="Learning rate")
     parser.add_argument("--weight_decay", type=float, default=1e-4, help="Weight decay")
     parser.add_argument("--dropout", type=float, default=0.35, help="Dropout probability")
-    parser.add_argument("--split_strategy", type=str, default="subject", choices=["subject", "cross_view", "cross_scene", "session"], help="Split strategy")
+    parser.add_argument(
+        "--split_strategy",
+        type=str,
+        default="subject",
+        choices=[
+            "subject",
+            "cross_view",
+            "cross_scene",
+            "session",
+            "official_x_scene",
+            "official_x_view",
+            "official_cross_scene",
+            "official_cross_view",
+        ],
+        help="Split strategy (supports official MMAct protocols: official_x_scene, official_x_view)",
+    )
+    parser.add_argument("--split_dir", type=str, default=None, help="Directory containing official MMAct split files")
+    parser.add_argument("--partition_val_for_test", action="store_true", help="Opt-in: Partition validation recordings into disjoint val and test sets (default: False)")
     parser.add_argument("--mode", type=str, default="multimodal", choices=["multimodal", "video_only", "sensor_only"], help="Model mode")
-    parser.add_argument("--video_backbone", type=str, default="cnn", choices=["cnn", "custom_cnn", "mobilenet_v2", "resnet18", "lightweight"], help="Video backbone")
+    parser.add_argument("--video_backbone", type=str, default="cnn", choices=["cnn", "custom_cnn", "original_cnn", "improved_cnn", "mobilenet_v2", "resnet18", "lightweight"], help="Video backbone")
     parser.add_argument("--sensor_backbone", type=str, default="inception_time", choices=["inception_time", "cnn1d"], help="Sensor backbone")
     parser.add_argument("--freeze_video", action="store_true", help="Freeze video backbone feature extractor")
     parser.add_argument("--staged_finetune", action="store_true", help="Enable staged fine-tuning for transfer learning (frozen head first, then unfreeze backbone)")
@@ -266,19 +285,34 @@ def main():
 
     # 2. Partition into Train / Val / Test
     print(f"\n[Step 2] Partitioning into {args.split_strategy}-independent splits...")
-    split_cfg = SplitConfig(split_strategy=args.split_strategy)
-    splitter = DatasetSplitter(split_cfg)
+    split_cfg = SplitConfig(
+        split_strategy=args.split_strategy,
+        partition_val_for_test=args.partition_val_for_test,
+        split_dir=Path(args.split_dir) if args.split_dir else None,
+        dataset_root=data_path,
+        seed=args.seed,
+    )
+    splitter = DatasetSplitter(split_cfg, dataset_root=data_path)
     train_samples, val_samples, test_samples = splitter.split(report.paired_samples)
 
-    print(f"  - Train Set : {len(train_samples)} samples")
-    print(f"  - Val Set   : {len(val_samples)} samples")
-    print(f"  - Test Set  : {len(test_samples)} samples")
+    if splitter.last_audit:
+        print(splitter.last_audit.summary())
+    else:
+        print(f"  - Train Set : {len(train_samples)} samples")
+        print(f"  - Val Set   : {len(val_samples)} samples")
+        print(f"  - Test Set  : {len(test_samples)} samples")
 
     isolation = verify_split_isolation(train_samples, val_samples, test_samples, strategy=args.split_strategy)
     for check_name, passed in isolation.items():
-        status = "PASSED" if passed else "FAILED"
-        print(f"      * {check_name:<30}: {status}")
-        assert passed, f"CRITICAL: Leakage detected across splits ({check_name})!"
+        if passed is not None:
+            status = "PASSED" if passed else "FAILED"
+            print(f"      * {check_name:<30}: {status}")
+            assert passed, f"CRITICAL: Leakage detected across splits ({check_name})!"
+
+    # Representation & Modality Audit
+    rep_audit = verify_split_representation(train_samples, val_samples, test_samples, check_disk_files=True)
+    print(f"  - Representation Audit: Train classes present={rep_audit['all_classes_present_train']}, Val classes present={rep_audit['all_classes_present_val']}")
+    print(f"  - Modality Integrity : All modalities verified={rep_audit['all_modalities_verified']}")
 
     # 3. Create Datasets & Loaders
     print("\n[Step 3] Initializing PyTorch Datasets and Caching...")
@@ -407,6 +441,7 @@ def main():
         "val_loss": [],
         "train_acc": [],
         "val_acc": [],
+        "lr": [],
         "train_time_sec": [],
         "val_time_sec": [],
         "peak_gpu_mem_mb": [],
@@ -419,9 +454,15 @@ def main():
         model.load_state_dict(resume_ckpt["model_state_dict"])
         if "optimizer_state_dict" in resume_ckpt:
             optimizer.load_state_dict(resume_ckpt["optimizer_state_dict"])
+        if "scheduler_state_dict" in resume_ckpt and resume_ckpt["scheduler_state_dict"] and scheduler:
+            scheduler.load_state_dict(resume_ckpt["scheduler_state_dict"])
+        if "scaler_state_dict" in resume_ckpt and resume_ckpt["scaler_state_dict"] and scaler:
+            scaler.load_state_dict(resume_ckpt["scaler_state_dict"])
         start_epoch = resume_ckpt.get("epoch", 0) + 1
         best_val_f1 = resume_ckpt.get("val_f1", -1.0)
         history = resume_ckpt.get("history", history)
+        if "lr" not in history:
+            history["lr"] = []
         print(f"  --> Resuming from Epoch {start_epoch} (Prior Best Val F1: {best_val_f1:.4f})")
 
     print(f"\n[Step 5] Training for {args.epochs} epochs (Starting at epoch {start_epoch})...")
@@ -463,11 +504,13 @@ def main():
         epoch_dur = train_dur + val_dur
 
         peak_mem = round(torch.cuda.max_memory_allocated(0) / (1024**2), 1) if device.type == "cuda" else 0.0
+        curr_lr = optimizer.param_groups[0]["lr"]
 
         history["train_loss"].append(train_loss)
         history["val_loss"].append(val_loss)
         history["train_acc"].append(train_acc)
         history["val_acc"].append(val_acc)
+        history["lr"].append(curr_lr)
         history["train_time_sec"].append(round(train_dur, 2))
         history["val_time_sec"].append(round(val_dur, 2))
         history["peak_gpu_mem_mb"].append(peak_mem)
@@ -481,7 +524,7 @@ def main():
         eta_str = time.strftime("%H:%M:%S", time.gmtime(max(0, eta_sec)))
 
         print(
-            f"Epoch {epoch:03d}/{args.epochs:03d} [{epoch_dur:.1f}s, ETA: {eta_str}{mem_info}] - "
+            f"Epoch {epoch:03d}/{args.epochs:03d} [{epoch_dur:.1f}s, ETA: {eta_str}{mem_info}, LR: {curr_lr:.6f}] - "
             f"Train Loss: {train_loss:.4f}, Train Acc: {train_acc:.2f}% | "
             f"Val Loss: {val_loss:.4f}, Val Acc: {val_acc:.2f}%, Val Macro F1: {val_f1:.4f}"
         )
@@ -491,6 +534,8 @@ def main():
             "epoch": epoch,
             "model_state_dict": model.state_dict(),
             "optimizer_state_dict": optimizer.state_dict(),
+            "scheduler_state_dict": scheduler.state_dict() if scheduler is not None else None,
+            "scaler_state_dict": scaler.state_dict() if (scaler is not None and use_amp) else None,
             "train_loss": train_loss,
             "val_loss": val_loss,
             "val_acc": val_acc,
@@ -505,6 +550,12 @@ def main():
         latest_filename = f"latest_model_{args.video_backbone}.pth"
         torch.save(ckpt_state, ckpt_dir / latest_filename)
         torch.save(ckpt_state, ckpt_dir / "latest_model.pth")
+
+        # Save history after every epoch for crash resilience
+        with open(output_dir / f"history_{args.video_backbone}.json", "w") as f:
+            json.dump(history, f, indent=2)
+        with open(output_dir / "history.json", "w") as f:
+            json.dump(history, f, indent=2)
 
         # Save best
         if val_f1 > best_val_f1:
@@ -605,6 +656,14 @@ def main():
         epochs_label=args.epochs,
         as_percent=False,
     )
+
+    if "lr" in history and history["lr"]:
+        plot_learning_rate_curve(history["lr"], plots_dir / f"learning_rate_schedule_{args.video_backbone}.png", model_name=args.video_backbone.upper())
+        plot_learning_rate_curve(history["lr"], plots_dir / "learning_rate_schedule.png", model_name=args.video_backbone.upper())
+
+    if history.get("train_acc") and history.get("val_acc"):
+        plot_generalization_gap(history["train_acc"], history["val_acc"], plots_dir / f"generalization_gap_{args.video_backbone}.png", model_name=args.video_backbone.upper())
+        plot_generalization_gap(history["train_acc"], history["val_acc"], plots_dir / "generalization_gap.png", model_name=args.video_backbone.upper())
 
     if best_metrics and "confusion_matrix" in best_metrics:
         cm_array = np.array(best_metrics["confusion_matrix"])
@@ -710,6 +769,17 @@ def main():
         "train_samples_count": len(train_samples),
         "val_samples_count": len(val_samples),
         "test_samples_count": len(test_samples),
+        "train_recordings_count": splitter.last_audit.train_recordings if splitter.last_audit else len({(s.subject, s.cam, s.scene, s.session) for s in train_samples}),
+        "val_recordings_count": splitter.last_audit.val_recordings if splitter.last_audit else len({(s.subject, s.cam, s.scene, s.session) for s in val_samples}),
+        "test_recordings_count": splitter.last_audit.test_recordings if splitter.last_audit else len({(s.subject, s.cam, s.scene, s.session) for s in test_samples}),
+        "is_official_split": splitter.last_audit.is_official if splitter.last_audit else False,
+        "is_custom_test_partition": splitter.last_audit.is_custom_test if splitter.last_audit else False,
+        "train_source_file": splitter.last_audit.train_file if splitter.last_audit else None,
+        "val_source_file": splitter.last_audit.val_file if splitter.last_audit else None,
+        "train_class_distribution": rep_audit.get("train_class_distribution", {}),
+        "val_class_distribution": rep_audit.get("val_class_distribution", {}),
+        "test_class_distribution": rep_audit.get("test_class_distribution", {}),
+        "split_isolation_results": {k: v for k, v in isolation.items() if v is not None},
         "package_versions": {
             "torch": torch.__version__,
             "numpy": np.__version__,

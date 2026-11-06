@@ -40,6 +40,12 @@ class StagingReport:
     linked_count: int = 0
     copied_count: int = 0
     repaired_count: int = 0
+    video_count_before: int = 0
+    sensor_count_before: int = 0
+    video_subjects_before: List[str] = field(default_factory=list)
+    new_subjects_added: List[str] = field(default_factory=list)
+    new_videos_added: int = 0
+    new_sensors_added: int = 0
 
     @property
     def is_valid(self) -> bool:
@@ -67,6 +73,16 @@ class StagingReport:
             f"Sensor Files Count     : {self.sensor_count}",
             f"Split Files Count      : {self.split_count}",
         ]
+        if self.video_subjects_before or self.new_subjects_added or self.new_videos_added > 0:
+            lines.extend([
+                "-" * 78,
+                "DATASET EXPANSION (BEFORE VS AFTER STAGING):",
+                f"  Initial Subjects Staged  : {sorted(self.video_subjects_before)} ({self.video_count_before} videos)",
+                f"  Final Subjects Staged    : {sorted(self.video_subjects)} ({self.video_count} videos)",
+                f"  New Subjects Discovered  : {self.new_subjects_added}",
+                f"  Net Usable Videos Added  : +{self.new_videos_added}",
+                f"  Net Usable Sensors Added : +{self.new_sensors_added}",
+            ])
         if self.missing_required_paths:
             lines.append("-" * 78)
             lines.append("MISSING REQUIRED PATHS:")
@@ -190,22 +206,8 @@ class FastMMActStager:
         """Executes bounded discovery and idempotent canonical staging."""
         t0 = time.time()
 
-        # 1. Quick check: Is canonical directory already populated and valid?
-        is_valid, v_cnt, s_cnt, sp_cnt, v_subjs, d_mods = self.check_existing_canonical()
-        if is_valid:
-            dur = time.time() - t0
-            return StagingReport(
-                dataset_root_selected=self.canonical_dir,
-                canonical_dir=self.canonical_dir,
-                expected_modalities=self.EXPECTED_MODALITIES,
-                discovered_modalities=d_mods,
-                video_count=v_cnt,
-                sensor_count=s_cnt,
-                split_count=sp_cnt,
-                video_subjects=v_subjs,
-                staging_duration_sec=dur,
-                reused=True,
-            )
+        # 1. Inspect existing canonical state (Before)
+        is_valid_before, v_cnt_before, s_cnt_before, sp_cnt_before, v_subjs_before, d_mods_before = self.check_existing_canonical()
 
         # 2. Gather candidates roots
         roots = [r for r in self.input_roots if r.exists()]
@@ -214,7 +216,25 @@ class FastMMActStager:
             if kaggle_input.exists():
                 roots.extend([p for p in kaggle_input.iterdir() if p.is_dir()])
 
-        if not roots:
+        if not roots and is_valid_before:
+            dur = time.time() - t0
+            return StagingReport(
+                dataset_root_selected=self.canonical_dir,
+                canonical_dir=self.canonical_dir,
+                expected_modalities=self.EXPECTED_MODALITIES,
+                discovered_modalities=d_mods_before,
+                video_count=v_cnt_before,
+                sensor_count=s_cnt_before,
+                split_count=sp_cnt_before,
+                video_subjects=v_subjs_before,
+                staging_duration_sec=dur,
+                reused=True,
+                video_count_before=v_cnt_before,
+                sensor_count_before=s_cnt_before,
+                video_subjects_before=v_subjs_before,
+            )
+
+        if not roots and not is_valid_before:
             dur = time.time() - t0
             return StagingReport(
                 dataset_root_selected=self.canonical_dir,
@@ -255,7 +275,7 @@ class FastMMActStager:
                 if child.is_file():
                     suffix = child.suffix.lower()
                     name_lower = child.name.lower()
-                    if suffix in {".zip", ".tar", ".gz"}:
+                    if suffix in {".zip", ".tar", ".gz", ".tgz"}:
                         discovered_archives.append(child)
                     elif suffix == ".txt" and any(k in name_lower for k in ["cross_scene", "cross_view", "train", "val", "test", "split"]):
                         if child.name not in discovered_splits:
@@ -375,6 +395,38 @@ class FastMMActStager:
                 missing.append(f"Missing required sensor modality: {exp_mod}")
 
         dur = time.time() - t0
+        new_subjs = sorted(list(set(v_subjs) - set(v_subjs_before)))
+        new_vids = max(0, v_cnt - v_cnt_before)
+        new_sens = max(0, s_cnt - s_cnt_before)
+        is_reused = is_valid_before and (new_vids == 0) and (new_sens == 0) and (len(new_subjs) == 0) and (linked_cnt == 0)
+
+        # Save expansion manifest
+        manifest_data = {
+            "dataset_root_selected": str(primary_root),
+            "canonical_dir": str(self.canonical_dir),
+            "video_count_before": v_cnt_before,
+            "video_count_after": v_cnt,
+            "new_videos_added": new_vids,
+            "sensor_count_before": s_cnt_before,
+            "sensor_count_after": s_cnt,
+            "new_sensors_added": new_sens,
+            "video_subjects_before": sorted(v_subjs_before),
+            "video_subjects_after": sorted(v_subjs),
+            "new_subjects_added": new_subjs,
+            "discovered_modalities": sorted(d_mods),
+            "staging_duration_sec": round(dur, 3),
+            "reused_existing": is_reused,
+        }
+        manifest_dir = Path("outputs/manifests")
+        manifest_dir.mkdir(parents=True, exist_ok=True)
+        manifest_file = manifest_dir / "dataset_expansion_manifest.json"
+        try:
+            import json
+            with open(manifest_file, "w", encoding="utf-8") as mf:
+                json.dump(manifest_data, mf, indent=2)
+        except Exception:
+            pass
+
         return StagingReport(
             dataset_root_selected=primary_root,
             canonical_dir=self.canonical_dir,
@@ -386,8 +438,14 @@ class FastMMActStager:
             video_subjects=v_subjs,
             missing_required_paths=missing,
             staging_duration_sec=dur,
-            reused=False,
+            reused=is_reused,
             linked_count=linked_cnt,
             copied_count=copied_cnt,
             repaired_count=repaired_cnt,
+            video_count_before=v_cnt_before,
+            sensor_count_before=s_cnt_before,
+            video_subjects_before=v_subjs_before,
+            new_subjects_added=new_subjs,
+            new_videos_added=new_vids,
+            new_sensors_added=new_sens,
         )

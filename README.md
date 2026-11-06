@@ -198,7 +198,7 @@ Outputs:
     --min_epochs 50 `
     --batch_size 8 `
     --lr 0.0001 `
-    --weight_decay 0.0005 \\\
+    --weight_decay 0.0005 `
     --dropout 0.35 `
     --staged_finetune `
     --unfreeze_epoch 15 `
@@ -327,10 +327,11 @@ All notebooks run completely top-to-bottom without manual intervention:
 
 ## 9. Known Limitations & Integrity Commitments
 
-1. **Dataset Availability:**
-   - The workspace contains `test_set_cross-view_1.zip` (14.99 GB, 13,869 unlabelled `.mp4` video files with obfuscated names for the CodaLab challenge leaderboard).
-   - This test release contains no ground truth labels and no sensor CSV files.
-   - Final official benchmark metrics on genuine paired MMAct data require downloading the trimmed train/val archives from the official Box repository (password authorized via the challenge organizers).
+1. **Dataset Availability & Annotation Status:**
+   - **Blind Challenge Evaluation Archive:** The unlabelled archive `test_set_cross-view_1` contains 5,424 obfuscated `.mp4` video clips with 16-character random hash filenames (e.g. `aabjrfahvetmvhxp.mp4`). This challenge set contains **zero ground truth labels, zero annotations, and zero paired wearable sensor CSV files** (held out by MMAct authors for blind server benchmarking). It cannot and must not be used for local supervised training or evaluation, and labels cannot be guessed or fabricated from filenames.
+   - **Staged Dataset Counts:** Exact sample, video, and recording counts depend on the specific subject archives attached and staged in the environment. All counts are computed dynamically by `MMActIndexer` and `FastMMActStager` and recorded in `outputs/manifests/dataset_expansion_manifest.json` rather than hardcoded. On the local baseline subset with video archives for `subject8` and `subject16` paired with wearable sensors (`acc_phone`, `acc_watch`, `gyro`), indexing discovers 496 paired multimodal samples across all 10 verified target classes. Official cross-scene split files (`trimmed_x-scene_train.txt`, `trimmed_x-scene_val.txt`) partition this baseline subset into 336 train and 160 validation samples. Attaching additional subject archives dynamically scales these counts.
+   - **Official Split Semantics vs. Custom Partitioning:** The MMAct release provides official `train` and `validation` split files (`trimmed_x-scene_train.txt`, `trimmed_x-scene_val.txt`, `trimmed_x-view_train.txt`, `trimmed_x-view_val.txt`). There is **no labelled official test split** in the public release. By default, evaluation is performed directly on the official validation partition and is explicitly labeled as `Official MMAct Validation Split`. An opt-in custom test partition (`--partition_val_for_test`) divides validation recordings into disjoint validation and test partitions at the atomic recording group level `(subject, scene, session)` with a deterministic seed, but this partition is strictly documented as a custom partition, never an official test set.
+   - **Zero Test-Set Model Selection:** Neither the official validation set nor any custom test partition is ever used for hyperparameter tuning, model checkpoint selection, learning rate schedules, or early stopping decisions. All tuning is restricted strictly to train/validation partitions.
 2. **Zero Fabrication:**
    - All synthetic smoke test artifacts are explicitly flagged with `is_synthetic: true` and `[SYNTHETIC]` metadata in `outputs/metrics.json` and `outputs/training_summary.json`.
    - Synthetic pipeline runs are never reported as genuine MMAct evaluation results.

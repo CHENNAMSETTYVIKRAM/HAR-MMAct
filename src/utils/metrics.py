@@ -77,7 +77,23 @@ def compute_classification_metrics(
 
     # Multiclass ROC AUC and PR AUC (One-vs-Rest)
     if y_prob is not None:
-        y_prob = np.asarray(y_prob, dtype=np.float32)
+        y_prob = np.asarray(y_prob, dtype=np.float64)
+
+        if y_prob.ndim != 2 or y_prob.shape != (len(y_true), num_classes):
+            raise ValueError(
+                f"y_prob must have shape ({len(y_true)}, {num_classes}); "
+                f"received {y_prob.shape}"
+            )
+
+        if not np.isfinite(y_prob).all() or (y_prob < 0).any():
+            raise ValueError("y_prob contains invalid probabilities")
+
+        row_sums = y_prob.sum(axis=1, keepdims=True)
+        if (row_sums <= 0).any():
+            raise ValueError("At least one probability row has a zero sum")
+
+        # Normalize rows to satisfy sklearn's multiclass probability check.
+        y_prob = y_prob / row_sums
         unique_classes = set(y_true)
 
         if len(unique_classes) > 1:

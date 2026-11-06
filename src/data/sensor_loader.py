@@ -122,9 +122,9 @@ class SensorLoader:
         }.get(modality, modality)
 
         rename_map = {c: f"{prefix}_{c}" for c in axis_cols}
-        df.rename(columns=rename_map, inplace=True)
+        df = df.rename(columns=rename_map)
         df["time"] = time_values
-        df.set_index("time", inplace=True)
+        df = df.set_index("time")
         df = df[~df.index.duplicated(keep="last")]
         return df
 
@@ -162,7 +162,7 @@ class SensorLoader:
         else:
             primary_df = primary_df.interpolate(method="linear").bfill().ffill()
 
-        primary_df.dropna(inplace=True)
+        primary_df = primary_df.dropna()
         return primary_df
 
     def create_fixed_window(

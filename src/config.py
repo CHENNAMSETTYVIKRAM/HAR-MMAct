@@ -101,11 +101,15 @@ class SensorConfig:
 
 @dataclass
 class SplitConfig:
-    # Split strategies: 'subject', 'scene', or 'cross_view'
+    # Split strategies: 'subject', 'cross_view', 'cross_scene', 'session', 'official_x_scene', 'official_x_view'
     split_strategy: str = "subject"
     train_ratio: float = 0.70
     val_ratio: float = 0.15
     test_ratio: float = 0.15
+    partition_val_for_test: bool = False
+    split_dir: Optional[Path] = None
+    dataset_root: Optional[Path] = None
+    seed: int = 42
     # Explicit subject partition defaults (1-20 total subjects in MMAct)
     train_subjects: List[str] = field(
         default_factory=lambda: [f"subject{i}" for i in range(1, 15)]

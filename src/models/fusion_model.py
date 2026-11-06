@@ -10,6 +10,7 @@ import torch.nn.functional as F
 from src.models.video_branch import (
     ResNet18VideoBranch,
     LightweightVideoBranch,
+    OriginalCNNVideoBranch,
     CustomCNNVideoBranch,
     MobileNetV2VideoBranch,
 )
@@ -64,7 +65,13 @@ class MultimodalHARModel(nn.Module):
                 pretrained_path=pretrained_path,
                 freeze_backbone=freeze_video_backbone,
             )
-        else:  # 'cnn', 'custom_cnn', 'lightweight'
+        elif video_backbone in ["original_cnn", "lightweight"]:
+            self.video_branch = OriginalCNNVideoBranch(
+                in_channels=video_channels,
+                embedding_dim=video_embed_dim,
+                dropout=dropout,
+            )
+        else:  # 'cnn', 'custom_cnn', 'improved_cnn'
             self.video_branch = CustomCNNVideoBranch(
                 in_channels=video_channels,
                 embedding_dim=video_embed_dim,

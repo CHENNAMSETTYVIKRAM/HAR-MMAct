@@ -66,6 +66,94 @@ def plot_confusion_matrix(
     plt.close(fig)
 
 
+def plot_learning_rate_curve(
+    lr_history: List[float],
+    output_path: Union[str, Path],
+    model_name: str = "Model",
+) -> None:
+    """
+    Renders epoch-wise learning rate schedule trajectory.
+    """
+    output_path = Path(output_path)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+
+    if not lr_history:
+        return
+
+    epochs = list(range(1, len(lr_history) + 1))
+    fig, ax = plt.subplots(figsize=(8, 4.5))
+    ax.plot(epochs, lr_history, color="#3182ce", lw=2.0, marker="o", markersize=3.0, label="Learning Rate")
+
+    ax.set_title(f"Learning Rate Schedule: {model_name}", fontsize=11, fontweight="bold")
+    ax.set_xlabel("Epochs", fontsize=10, fontweight="semibold")
+    ax.set_ylabel("Learning Rate", fontsize=10, fontweight="semibold")
+    ax.set_yscale("log")
+    ax.grid(True, which="both", linestyle="--", alpha=0.5)
+    ax.legend(loc="upper right")
+
+    final_lr = lr_history[-1]
+    ax.annotate(
+        f"Final LR: {final_lr:.2e}",
+        xy=(epochs[-1], final_lr),
+        xytext=(max(1, epochs[-1] - max(1, len(epochs) // 4)), final_lr * 1.5),
+        arrowprops=dict(facecolor="#3182ce", shrink=0.08, width=1, headwidth=4),
+        fontsize=8,
+        fontweight="bold",
+        color="#2b6cb0",
+    )
+
+    fig.tight_layout()
+    plt.savefig(output_path, dpi=200, bbox_inches="tight")
+    plt.close(fig)
+
+
+def plot_generalization_gap(
+    train_acc: List[float],
+    val_acc: List[float],
+    output_path: Union[str, Path],
+    model_name: str = "Model",
+) -> None:
+    """
+    Renders generalization gap (|Train Acc - Val Acc|) curve across training epochs.
+    """
+    output_path = Path(output_path)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+
+    n_epochs = min(len(train_acc), len(val_acc))
+    if n_epochs == 0:
+        return
+
+    t_vals = [v * 100.0 if max(train_acc or [0.0]) <= 1.0 else v for v in train_acc[:n_epochs]]
+    v_vals = [v * 100.0 if max(val_acc or [0.0]) <= 1.0 else v for v in val_acc[:n_epochs]]
+    gap = [t - v for t, v in zip(t_vals, v_vals)]
+    epochs = list(range(1, n_epochs + 1))
+
+    fig, ax = plt.subplots(figsize=(8, 4.5))
+    ax.plot(epochs, gap, color="#805ad5", lw=2.0, marker="^", markersize=3.5, label="Train - Val Accuracy Gap (%)")
+    ax.axhline(0, color="#a0aec0", linestyle="--", lw=1.0)
+
+    ax.set_title(f"Generalization Gap: {model_name}", fontsize=11, fontweight="bold")
+    ax.set_xlabel("Epochs", fontsize=10, fontweight="semibold")
+    ax.set_ylabel("Accuracy Gap (%)", fontsize=10, fontweight="semibold")
+    ax.grid(True, linestyle="--", alpha=0.5)
+    ax.legend(loc="upper left")
+
+    final_gap = gap[-1]
+    ax.annotate(
+        f"Final Gap: {final_gap:.1f}%",
+        xy=(epochs[-1], final_gap),
+        xytext=(max(1, epochs[-1] - max(1, n_epochs // 4)), final_gap + 2.0),
+        arrowprops=dict(facecolor="#805ad5", shrink=0.08, width=1, headwidth=4),
+        fontsize=8,
+        fontweight="bold",
+        color="#6b46c1",
+    )
+
+    fig.tight_layout()
+    plt.savefig(output_path, dpi=200, bbox_inches="tight")
+    plt.close(fig)
+
+
 def plot_training_curves(
     train_losses: List[float],
     val_losses: List[float],
@@ -105,6 +193,94 @@ def plot_training_curves(
     plt.close(fig)
 
 
+def plot_learning_rate_curve(
+    lr_history: List[float],
+    output_path: Union[str, Path],
+    model_name: str = "Model",
+) -> None:
+    """
+    Renders epoch-wise learning rate schedule trajectory.
+    """
+    output_path = Path(output_path)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+
+    if not lr_history:
+        return
+
+    epochs = list(range(1, len(lr_history) + 1))
+    fig, ax = plt.subplots(figsize=(8, 4.5))
+    ax.plot(epochs, lr_history, color="#3182ce", lw=2.0, marker="o", markersize=3.0, label="Learning Rate")
+
+    ax.set_title(f"Learning Rate Schedule: {model_name}", fontsize=11, fontweight="bold")
+    ax.set_xlabel("Epochs", fontsize=10, fontweight="semibold")
+    ax.set_ylabel("Learning Rate", fontsize=10, fontweight="semibold")
+    ax.set_yscale("log")
+    ax.grid(True, which="both", linestyle="--", alpha=0.5)
+    ax.legend(loc="upper right")
+
+    final_lr = lr_history[-1]
+    ax.annotate(
+        f"Final LR: {final_lr:.2e}",
+        xy=(epochs[-1], final_lr),
+        xytext=(max(1, epochs[-1] - max(1, len(epochs) // 4)), final_lr * 1.5),
+        arrowprops=dict(facecolor="#3182ce", shrink=0.08, width=1, headwidth=4),
+        fontsize=8,
+        fontweight="bold",
+        color="#2b6cb0",
+    )
+
+    fig.tight_layout()
+    plt.savefig(output_path, dpi=200, bbox_inches="tight")
+    plt.close(fig)
+
+
+def plot_generalization_gap(
+    train_acc: List[float],
+    val_acc: List[float],
+    output_path: Union[str, Path],
+    model_name: str = "Model",
+) -> None:
+    """
+    Renders generalization gap (|Train Acc - Val Acc|) curve across training epochs.
+    """
+    output_path = Path(output_path)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+
+    n_epochs = min(len(train_acc), len(val_acc))
+    if n_epochs == 0:
+        return
+
+    t_vals = [v * 100.0 if max(train_acc or [0.0]) <= 1.0 else v for v in train_acc[:n_epochs]]
+    v_vals = [v * 100.0 if max(val_acc or [0.0]) <= 1.0 else v for v in val_acc[:n_epochs]]
+    gap = [t - v for t, v in zip(t_vals, v_vals)]
+    epochs = list(range(1, n_epochs + 1))
+
+    fig, ax = plt.subplots(figsize=(8, 4.5))
+    ax.plot(epochs, gap, color="#805ad5", lw=2.0, marker="^", markersize=3.5, label="Train - Val Accuracy Gap (%)")
+    ax.axhline(0, color="#a0aec0", linestyle="--", lw=1.0)
+
+    ax.set_title(f"Generalization Gap: {model_name}", fontsize=11, fontweight="bold")
+    ax.set_xlabel("Epochs", fontsize=10, fontweight="semibold")
+    ax.set_ylabel("Accuracy Gap (%)", fontsize=10, fontweight="semibold")
+    ax.grid(True, linestyle="--", alpha=0.5)
+    ax.legend(loc="upper left")
+
+    final_gap = gap[-1]
+    ax.annotate(
+        f"Final Gap: {final_gap:.1f}%",
+        xy=(epochs[-1], final_gap),
+        xytext=(max(1, epochs[-1] - max(1, n_epochs // 4)), final_gap + 2.0),
+        arrowprops=dict(facecolor="#805ad5", shrink=0.08, width=1, headwidth=4),
+        fontsize=8,
+        fontweight="bold",
+        color="#6b46c1",
+    )
+
+    fig.tight_layout()
+    plt.savefig(output_path, dpi=200, bbox_inches="tight")
+    plt.close(fig)
+
+
 def plot_loss_curve_standalone(
     train_losses: List[float],
     val_losses: List[float],
@@ -128,6 +304,94 @@ def plot_loss_curve_standalone(
     ax.set_ylabel("Loss", fontsize=10)
     ax.legend(loc="upper right", frameon=True)
     ax.grid(True, color="#cbd5e0", linestyle="-", linewidth=0.7, alpha=0.7)
+
+    fig.tight_layout()
+    plt.savefig(output_path, dpi=200, bbox_inches="tight")
+    plt.close(fig)
+
+
+def plot_learning_rate_curve(
+    lr_history: List[float],
+    output_path: Union[str, Path],
+    model_name: str = "Model",
+) -> None:
+    """
+    Renders epoch-wise learning rate schedule trajectory.
+    """
+    output_path = Path(output_path)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+
+    if not lr_history:
+        return
+
+    epochs = list(range(1, len(lr_history) + 1))
+    fig, ax = plt.subplots(figsize=(8, 4.5))
+    ax.plot(epochs, lr_history, color="#3182ce", lw=2.0, marker="o", markersize=3.0, label="Learning Rate")
+
+    ax.set_title(f"Learning Rate Schedule: {model_name}", fontsize=11, fontweight="bold")
+    ax.set_xlabel("Epochs", fontsize=10, fontweight="semibold")
+    ax.set_ylabel("Learning Rate", fontsize=10, fontweight="semibold")
+    ax.set_yscale("log")
+    ax.grid(True, which="both", linestyle="--", alpha=0.5)
+    ax.legend(loc="upper right")
+
+    final_lr = lr_history[-1]
+    ax.annotate(
+        f"Final LR: {final_lr:.2e}",
+        xy=(epochs[-1], final_lr),
+        xytext=(max(1, epochs[-1] - max(1, len(epochs) // 4)), final_lr * 1.5),
+        arrowprops=dict(facecolor="#3182ce", shrink=0.08, width=1, headwidth=4),
+        fontsize=8,
+        fontweight="bold",
+        color="#2b6cb0",
+    )
+
+    fig.tight_layout()
+    plt.savefig(output_path, dpi=200, bbox_inches="tight")
+    plt.close(fig)
+
+
+def plot_generalization_gap(
+    train_acc: List[float],
+    val_acc: List[float],
+    output_path: Union[str, Path],
+    model_name: str = "Model",
+) -> None:
+    """
+    Renders generalization gap (|Train Acc - Val Acc|) curve across training epochs.
+    """
+    output_path = Path(output_path)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+
+    n_epochs = min(len(train_acc), len(val_acc))
+    if n_epochs == 0:
+        return
+
+    t_vals = [v * 100.0 if max(train_acc or [0.0]) <= 1.0 else v for v in train_acc[:n_epochs]]
+    v_vals = [v * 100.0 if max(val_acc or [0.0]) <= 1.0 else v for v in val_acc[:n_epochs]]
+    gap = [t - v for t, v in zip(t_vals, v_vals)]
+    epochs = list(range(1, n_epochs + 1))
+
+    fig, ax = plt.subplots(figsize=(8, 4.5))
+    ax.plot(epochs, gap, color="#805ad5", lw=2.0, marker="^", markersize=3.5, label="Train - Val Accuracy Gap (%)")
+    ax.axhline(0, color="#a0aec0", linestyle="--", lw=1.0)
+
+    ax.set_title(f"Generalization Gap: {model_name}", fontsize=11, fontweight="bold")
+    ax.set_xlabel("Epochs", fontsize=10, fontweight="semibold")
+    ax.set_ylabel("Accuracy Gap (%)", fontsize=10, fontweight="semibold")
+    ax.grid(True, linestyle="--", alpha=0.5)
+    ax.legend(loc="upper left")
+
+    final_gap = gap[-1]
+    ax.annotate(
+        f"Final Gap: {final_gap:.1f}%",
+        xy=(epochs[-1], final_gap),
+        xytext=(max(1, epochs[-1] - max(1, n_epochs // 4)), final_gap + 2.0),
+        arrowprops=dict(facecolor="#805ad5", shrink=0.08, width=1, headwidth=4),
+        fontsize=8,
+        fontweight="bold",
+        color="#6b46c1",
+    )
 
     fig.tight_layout()
     plt.savefig(output_path, dpi=200, bbox_inches="tight")
@@ -162,6 +426,94 @@ def plot_accuracy_curve_standalone(
     ax.set_ylabel("Accuracy", fontsize=10)
     ax.legend(loc="lower right", frameon=True)
     ax.grid(True, color="#cbd5e0", linestyle="-", linewidth=0.7, alpha=0.7)
+
+    fig.tight_layout()
+    plt.savefig(output_path, dpi=200, bbox_inches="tight")
+    plt.close(fig)
+
+
+def plot_learning_rate_curve(
+    lr_history: List[float],
+    output_path: Union[str, Path],
+    model_name: str = "Model",
+) -> None:
+    """
+    Renders epoch-wise learning rate schedule trajectory.
+    """
+    output_path = Path(output_path)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+
+    if not lr_history:
+        return
+
+    epochs = list(range(1, len(lr_history) + 1))
+    fig, ax = plt.subplots(figsize=(8, 4.5))
+    ax.plot(epochs, lr_history, color="#3182ce", lw=2.0, marker="o", markersize=3.0, label="Learning Rate")
+
+    ax.set_title(f"Learning Rate Schedule: {model_name}", fontsize=11, fontweight="bold")
+    ax.set_xlabel("Epochs", fontsize=10, fontweight="semibold")
+    ax.set_ylabel("Learning Rate", fontsize=10, fontweight="semibold")
+    ax.set_yscale("log")
+    ax.grid(True, which="both", linestyle="--", alpha=0.5)
+    ax.legend(loc="upper right")
+
+    final_lr = lr_history[-1]
+    ax.annotate(
+        f"Final LR: {final_lr:.2e}",
+        xy=(epochs[-1], final_lr),
+        xytext=(max(1, epochs[-1] - max(1, len(epochs) // 4)), final_lr * 1.5),
+        arrowprops=dict(facecolor="#3182ce", shrink=0.08, width=1, headwidth=4),
+        fontsize=8,
+        fontweight="bold",
+        color="#2b6cb0",
+    )
+
+    fig.tight_layout()
+    plt.savefig(output_path, dpi=200, bbox_inches="tight")
+    plt.close(fig)
+
+
+def plot_generalization_gap(
+    train_acc: List[float],
+    val_acc: List[float],
+    output_path: Union[str, Path],
+    model_name: str = "Model",
+) -> None:
+    """
+    Renders generalization gap (|Train Acc - Val Acc|) curve across training epochs.
+    """
+    output_path = Path(output_path)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+
+    n_epochs = min(len(train_acc), len(val_acc))
+    if n_epochs == 0:
+        return
+
+    t_vals = [v * 100.0 if max(train_acc or [0.0]) <= 1.0 else v for v in train_acc[:n_epochs]]
+    v_vals = [v * 100.0 if max(val_acc or [0.0]) <= 1.0 else v for v in val_acc[:n_epochs]]
+    gap = [t - v for t, v in zip(t_vals, v_vals)]
+    epochs = list(range(1, n_epochs + 1))
+
+    fig, ax = plt.subplots(figsize=(8, 4.5))
+    ax.plot(epochs, gap, color="#805ad5", lw=2.0, marker="^", markersize=3.5, label="Train - Val Accuracy Gap (%)")
+    ax.axhline(0, color="#a0aec0", linestyle="--", lw=1.0)
+
+    ax.set_title(f"Generalization Gap: {model_name}", fontsize=11, fontweight="bold")
+    ax.set_xlabel("Epochs", fontsize=10, fontweight="semibold")
+    ax.set_ylabel("Accuracy Gap (%)", fontsize=10, fontweight="semibold")
+    ax.grid(True, linestyle="--", alpha=0.5)
+    ax.legend(loc="upper left")
+
+    final_gap = gap[-1]
+    ax.annotate(
+        f"Final Gap: {final_gap:.1f}%",
+        xy=(epochs[-1], final_gap),
+        xytext=(max(1, epochs[-1] - max(1, n_epochs // 4)), final_gap + 2.0),
+        arrowprops=dict(facecolor="#805ad5", shrink=0.08, width=1, headwidth=4),
+        fontsize=8,
+        fontweight="bold",
+        color="#6b46c1",
+    )
 
     fig.tight_layout()
     plt.savefig(output_path, dpi=200, bbox_inches="tight")
@@ -227,6 +579,94 @@ def plot_annotated_train_test_accuracy(
     plt.close(fig)
 
 
+def plot_learning_rate_curve(
+    lr_history: List[float],
+    output_path: Union[str, Path],
+    model_name: str = "Model",
+) -> None:
+    """
+    Renders epoch-wise learning rate schedule trajectory.
+    """
+    output_path = Path(output_path)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+
+    if not lr_history:
+        return
+
+    epochs = list(range(1, len(lr_history) + 1))
+    fig, ax = plt.subplots(figsize=(8, 4.5))
+    ax.plot(epochs, lr_history, color="#3182ce", lw=2.0, marker="o", markersize=3.0, label="Learning Rate")
+
+    ax.set_title(f"Learning Rate Schedule: {model_name}", fontsize=11, fontweight="bold")
+    ax.set_xlabel("Epochs", fontsize=10, fontweight="semibold")
+    ax.set_ylabel("Learning Rate", fontsize=10, fontweight="semibold")
+    ax.set_yscale("log")
+    ax.grid(True, which="both", linestyle="--", alpha=0.5)
+    ax.legend(loc="upper right")
+
+    final_lr = lr_history[-1]
+    ax.annotate(
+        f"Final LR: {final_lr:.2e}",
+        xy=(epochs[-1], final_lr),
+        xytext=(max(1, epochs[-1] - max(1, len(epochs) // 4)), final_lr * 1.5),
+        arrowprops=dict(facecolor="#3182ce", shrink=0.08, width=1, headwidth=4),
+        fontsize=8,
+        fontweight="bold",
+        color="#2b6cb0",
+    )
+
+    fig.tight_layout()
+    plt.savefig(output_path, dpi=200, bbox_inches="tight")
+    plt.close(fig)
+
+
+def plot_generalization_gap(
+    train_acc: List[float],
+    val_acc: List[float],
+    output_path: Union[str, Path],
+    model_name: str = "Model",
+) -> None:
+    """
+    Renders generalization gap (|Train Acc - Val Acc|) curve across training epochs.
+    """
+    output_path = Path(output_path)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+
+    n_epochs = min(len(train_acc), len(val_acc))
+    if n_epochs == 0:
+        return
+
+    t_vals = [v * 100.0 if max(train_acc or [0.0]) <= 1.0 else v for v in train_acc[:n_epochs]]
+    v_vals = [v * 100.0 if max(val_acc or [0.0]) <= 1.0 else v for v in val_acc[:n_epochs]]
+    gap = [t - v for t, v in zip(t_vals, v_vals)]
+    epochs = list(range(1, n_epochs + 1))
+
+    fig, ax = plt.subplots(figsize=(8, 4.5))
+    ax.plot(epochs, gap, color="#805ad5", lw=2.0, marker="^", markersize=3.5, label="Train - Val Accuracy Gap (%)")
+    ax.axhline(0, color="#a0aec0", linestyle="--", lw=1.0)
+
+    ax.set_title(f"Generalization Gap: {model_name}", fontsize=11, fontweight="bold")
+    ax.set_xlabel("Epochs", fontsize=10, fontweight="semibold")
+    ax.set_ylabel("Accuracy Gap (%)", fontsize=10, fontweight="semibold")
+    ax.grid(True, linestyle="--", alpha=0.5)
+    ax.legend(loc="upper left")
+
+    final_gap = gap[-1]
+    ax.annotate(
+        f"Final Gap: {final_gap:.1f}%",
+        xy=(epochs[-1], final_gap),
+        xytext=(max(1, epochs[-1] - max(1, n_epochs // 4)), final_gap + 2.0),
+        arrowprops=dict(facecolor="#805ad5", shrink=0.08, width=1, headwidth=4),
+        fontsize=8,
+        fontweight="bold",
+        color="#6b46c1",
+    )
+
+    fig.tight_layout()
+    plt.savefig(output_path, dpi=200, bbox_inches="tight")
+    plt.close(fig)
+
+
 def plot_multiclass_roc(
     y_true: np.ndarray,
     y_prob: np.ndarray,
@@ -265,6 +705,94 @@ def plot_multiclass_roc(
     if has_curve:
         ax.legend(loc="lower right", fontsize=8)
     ax.grid(True, linestyle="--", alpha=0.6)
+
+    fig.tight_layout()
+    plt.savefig(output_path, dpi=200, bbox_inches="tight")
+    plt.close(fig)
+
+
+def plot_learning_rate_curve(
+    lr_history: List[float],
+    output_path: Union[str, Path],
+    model_name: str = "Model",
+) -> None:
+    """
+    Renders epoch-wise learning rate schedule trajectory.
+    """
+    output_path = Path(output_path)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+
+    if not lr_history:
+        return
+
+    epochs = list(range(1, len(lr_history) + 1))
+    fig, ax = plt.subplots(figsize=(8, 4.5))
+    ax.plot(epochs, lr_history, color="#3182ce", lw=2.0, marker="o", markersize=3.0, label="Learning Rate")
+
+    ax.set_title(f"Learning Rate Schedule: {model_name}", fontsize=11, fontweight="bold")
+    ax.set_xlabel("Epochs", fontsize=10, fontweight="semibold")
+    ax.set_ylabel("Learning Rate", fontsize=10, fontweight="semibold")
+    ax.set_yscale("log")
+    ax.grid(True, which="both", linestyle="--", alpha=0.5)
+    ax.legend(loc="upper right")
+
+    final_lr = lr_history[-1]
+    ax.annotate(
+        f"Final LR: {final_lr:.2e}",
+        xy=(epochs[-1], final_lr),
+        xytext=(max(1, epochs[-1] - max(1, len(epochs) // 4)), final_lr * 1.5),
+        arrowprops=dict(facecolor="#3182ce", shrink=0.08, width=1, headwidth=4),
+        fontsize=8,
+        fontweight="bold",
+        color="#2b6cb0",
+    )
+
+    fig.tight_layout()
+    plt.savefig(output_path, dpi=200, bbox_inches="tight")
+    plt.close(fig)
+
+
+def plot_generalization_gap(
+    train_acc: List[float],
+    val_acc: List[float],
+    output_path: Union[str, Path],
+    model_name: str = "Model",
+) -> None:
+    """
+    Renders generalization gap (|Train Acc - Val Acc|) curve across training epochs.
+    """
+    output_path = Path(output_path)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+
+    n_epochs = min(len(train_acc), len(val_acc))
+    if n_epochs == 0:
+        return
+
+    t_vals = [v * 100.0 if max(train_acc or [0.0]) <= 1.0 else v for v in train_acc[:n_epochs]]
+    v_vals = [v * 100.0 if max(val_acc or [0.0]) <= 1.0 else v for v in val_acc[:n_epochs]]
+    gap = [t - v for t, v in zip(t_vals, v_vals)]
+    epochs = list(range(1, n_epochs + 1))
+
+    fig, ax = plt.subplots(figsize=(8, 4.5))
+    ax.plot(epochs, gap, color="#805ad5", lw=2.0, marker="^", markersize=3.5, label="Train - Val Accuracy Gap (%)")
+    ax.axhline(0, color="#a0aec0", linestyle="--", lw=1.0)
+
+    ax.set_title(f"Generalization Gap: {model_name}", fontsize=11, fontweight="bold")
+    ax.set_xlabel("Epochs", fontsize=10, fontweight="semibold")
+    ax.set_ylabel("Accuracy Gap (%)", fontsize=10, fontweight="semibold")
+    ax.grid(True, linestyle="--", alpha=0.5)
+    ax.legend(loc="upper left")
+
+    final_gap = gap[-1]
+    ax.annotate(
+        f"Final Gap: {final_gap:.1f}%",
+        xy=(epochs[-1], final_gap),
+        xytext=(max(1, epochs[-1] - max(1, n_epochs // 4)), final_gap + 2.0),
+        arrowprops=dict(facecolor="#805ad5", shrink=0.08, width=1, headwidth=4),
+        fontsize=8,
+        fontweight="bold",
+        color="#6b46c1",
+    )
 
     fig.tight_layout()
     plt.savefig(output_path, dpi=200, bbox_inches="tight")
@@ -313,6 +841,94 @@ def plot_multiclass_pr(
     plt.close(fig)
 
 
+def plot_learning_rate_curve(
+    lr_history: List[float],
+    output_path: Union[str, Path],
+    model_name: str = "Model",
+) -> None:
+    """
+    Renders epoch-wise learning rate schedule trajectory.
+    """
+    output_path = Path(output_path)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+
+    if not lr_history:
+        return
+
+    epochs = list(range(1, len(lr_history) + 1))
+    fig, ax = plt.subplots(figsize=(8, 4.5))
+    ax.plot(epochs, lr_history, color="#3182ce", lw=2.0, marker="o", markersize=3.0, label="Learning Rate")
+
+    ax.set_title(f"Learning Rate Schedule: {model_name}", fontsize=11, fontweight="bold")
+    ax.set_xlabel("Epochs", fontsize=10, fontweight="semibold")
+    ax.set_ylabel("Learning Rate", fontsize=10, fontweight="semibold")
+    ax.set_yscale("log")
+    ax.grid(True, which="both", linestyle="--", alpha=0.5)
+    ax.legend(loc="upper right")
+
+    final_lr = lr_history[-1]
+    ax.annotate(
+        f"Final LR: {final_lr:.2e}",
+        xy=(epochs[-1], final_lr),
+        xytext=(max(1, epochs[-1] - max(1, len(epochs) // 4)), final_lr * 1.5),
+        arrowprops=dict(facecolor="#3182ce", shrink=0.08, width=1, headwidth=4),
+        fontsize=8,
+        fontweight="bold",
+        color="#2b6cb0",
+    )
+
+    fig.tight_layout()
+    plt.savefig(output_path, dpi=200, bbox_inches="tight")
+    plt.close(fig)
+
+
+def plot_generalization_gap(
+    train_acc: List[float],
+    val_acc: List[float],
+    output_path: Union[str, Path],
+    model_name: str = "Model",
+) -> None:
+    """
+    Renders generalization gap (|Train Acc - Val Acc|) curve across training epochs.
+    """
+    output_path = Path(output_path)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+
+    n_epochs = min(len(train_acc), len(val_acc))
+    if n_epochs == 0:
+        return
+
+    t_vals = [v * 100.0 if max(train_acc or [0.0]) <= 1.0 else v for v in train_acc[:n_epochs]]
+    v_vals = [v * 100.0 if max(val_acc or [0.0]) <= 1.0 else v for v in val_acc[:n_epochs]]
+    gap = [t - v for t, v in zip(t_vals, v_vals)]
+    epochs = list(range(1, n_epochs + 1))
+
+    fig, ax = plt.subplots(figsize=(8, 4.5))
+    ax.plot(epochs, gap, color="#805ad5", lw=2.0, marker="^", markersize=3.5, label="Train - Val Accuracy Gap (%)")
+    ax.axhline(0, color="#a0aec0", linestyle="--", lw=1.0)
+
+    ax.set_title(f"Generalization Gap: {model_name}", fontsize=11, fontweight="bold")
+    ax.set_xlabel("Epochs", fontsize=10, fontweight="semibold")
+    ax.set_ylabel("Accuracy Gap (%)", fontsize=10, fontweight="semibold")
+    ax.grid(True, linestyle="--", alpha=0.5)
+    ax.legend(loc="upper left")
+
+    final_gap = gap[-1]
+    ax.annotate(
+        f"Final Gap: {final_gap:.1f}%",
+        xy=(epochs[-1], final_gap),
+        xytext=(max(1, epochs[-1] - max(1, n_epochs // 4)), final_gap + 2.0),
+        arrowprops=dict(facecolor="#805ad5", shrink=0.08, width=1, headwidth=4),
+        fontsize=8,
+        fontweight="bold",
+        color="#6b46c1",
+    )
+
+    fig.tight_layout()
+    plt.savefig(output_path, dpi=200, bbox_inches="tight")
+    plt.close(fig)
+
+
 def plot_cnn_vs_mobilenet_comparison(
     cnn_history: Dict[str, List[float]],
     mobilenet_history: Dict[str, List[float]],
@@ -354,6 +970,94 @@ def plot_cnn_vs_mobilenet_comparison(
     plt.close(fig)
 
 
+def plot_learning_rate_curve(
+    lr_history: List[float],
+    output_path: Union[str, Path],
+    model_name: str = "Model",
+) -> None:
+    """
+    Renders epoch-wise learning rate schedule trajectory.
+    """
+    output_path = Path(output_path)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+
+    if not lr_history:
+        return
+
+    epochs = list(range(1, len(lr_history) + 1))
+    fig, ax = plt.subplots(figsize=(8, 4.5))
+    ax.plot(epochs, lr_history, color="#3182ce", lw=2.0, marker="o", markersize=3.0, label="Learning Rate")
+
+    ax.set_title(f"Learning Rate Schedule: {model_name}", fontsize=11, fontweight="bold")
+    ax.set_xlabel("Epochs", fontsize=10, fontweight="semibold")
+    ax.set_ylabel("Learning Rate", fontsize=10, fontweight="semibold")
+    ax.set_yscale("log")
+    ax.grid(True, which="both", linestyle="--", alpha=0.5)
+    ax.legend(loc="upper right")
+
+    final_lr = lr_history[-1]
+    ax.annotate(
+        f"Final LR: {final_lr:.2e}",
+        xy=(epochs[-1], final_lr),
+        xytext=(max(1, epochs[-1] - max(1, len(epochs) // 4)), final_lr * 1.5),
+        arrowprops=dict(facecolor="#3182ce", shrink=0.08, width=1, headwidth=4),
+        fontsize=8,
+        fontweight="bold",
+        color="#2b6cb0",
+    )
+
+    fig.tight_layout()
+    plt.savefig(output_path, dpi=200, bbox_inches="tight")
+    plt.close(fig)
+
+
+def plot_generalization_gap(
+    train_acc: List[float],
+    val_acc: List[float],
+    output_path: Union[str, Path],
+    model_name: str = "Model",
+) -> None:
+    """
+    Renders generalization gap (|Train Acc - Val Acc|) curve across training epochs.
+    """
+    output_path = Path(output_path)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+
+    n_epochs = min(len(train_acc), len(val_acc))
+    if n_epochs == 0:
+        return
+
+    t_vals = [v * 100.0 if max(train_acc or [0.0]) <= 1.0 else v for v in train_acc[:n_epochs]]
+    v_vals = [v * 100.0 if max(val_acc or [0.0]) <= 1.0 else v for v in val_acc[:n_epochs]]
+    gap = [t - v for t, v in zip(t_vals, v_vals)]
+    epochs = list(range(1, n_epochs + 1))
+
+    fig, ax = plt.subplots(figsize=(8, 4.5))
+    ax.plot(epochs, gap, color="#805ad5", lw=2.0, marker="^", markersize=3.5, label="Train - Val Accuracy Gap (%)")
+    ax.axhline(0, color="#a0aec0", linestyle="--", lw=1.0)
+
+    ax.set_title(f"Generalization Gap: {model_name}", fontsize=11, fontweight="bold")
+    ax.set_xlabel("Epochs", fontsize=10, fontweight="semibold")
+    ax.set_ylabel("Accuracy Gap (%)", fontsize=10, fontweight="semibold")
+    ax.grid(True, linestyle="--", alpha=0.5)
+    ax.legend(loc="upper left")
+
+    final_gap = gap[-1]
+    ax.annotate(
+        f"Final Gap: {final_gap:.1f}%",
+        xy=(epochs[-1], final_gap),
+        xytext=(max(1, epochs[-1] - max(1, n_epochs // 4)), final_gap + 2.0),
+        arrowprops=dict(facecolor="#805ad5", shrink=0.08, width=1, headwidth=4),
+        fontsize=8,
+        fontweight="bold",
+        color="#6b46c1",
+    )
+
+    fig.tight_layout()
+    plt.savefig(output_path, dpi=200, bbox_inches="tight")
+    plt.close(fig)
+
+
 def plot_per_class_metrics(
     per_class_dict: Dict[str, Dict[str, float]],
     output_path: Union[str, Path],
@@ -386,6 +1090,94 @@ def plot_per_class_metrics(
     ax.set_ylim([0, 105])
     ax.legend(loc="upper right")
     ax.grid(axis="y", linestyle="--", alpha=0.6)
+
+    fig.tight_layout()
+    plt.savefig(output_path, dpi=200, bbox_inches="tight")
+    plt.close(fig)
+
+
+def plot_learning_rate_curve(
+    lr_history: List[float],
+    output_path: Union[str, Path],
+    model_name: str = "Model",
+) -> None:
+    """
+    Renders epoch-wise learning rate schedule trajectory.
+    """
+    output_path = Path(output_path)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+
+    if not lr_history:
+        return
+
+    epochs = list(range(1, len(lr_history) + 1))
+    fig, ax = plt.subplots(figsize=(8, 4.5))
+    ax.plot(epochs, lr_history, color="#3182ce", lw=2.0, marker="o", markersize=3.0, label="Learning Rate")
+
+    ax.set_title(f"Learning Rate Schedule: {model_name}", fontsize=11, fontweight="bold")
+    ax.set_xlabel("Epochs", fontsize=10, fontweight="semibold")
+    ax.set_ylabel("Learning Rate", fontsize=10, fontweight="semibold")
+    ax.set_yscale("log")
+    ax.grid(True, which="both", linestyle="--", alpha=0.5)
+    ax.legend(loc="upper right")
+
+    final_lr = lr_history[-1]
+    ax.annotate(
+        f"Final LR: {final_lr:.2e}",
+        xy=(epochs[-1], final_lr),
+        xytext=(max(1, epochs[-1] - max(1, len(epochs) // 4)), final_lr * 1.5),
+        arrowprops=dict(facecolor="#3182ce", shrink=0.08, width=1, headwidth=4),
+        fontsize=8,
+        fontweight="bold",
+        color="#2b6cb0",
+    )
+
+    fig.tight_layout()
+    plt.savefig(output_path, dpi=200, bbox_inches="tight")
+    plt.close(fig)
+
+
+def plot_generalization_gap(
+    train_acc: List[float],
+    val_acc: List[float],
+    output_path: Union[str, Path],
+    model_name: str = "Model",
+) -> None:
+    """
+    Renders generalization gap (|Train Acc - Val Acc|) curve across training epochs.
+    """
+    output_path = Path(output_path)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+
+    n_epochs = min(len(train_acc), len(val_acc))
+    if n_epochs == 0:
+        return
+
+    t_vals = [v * 100.0 if max(train_acc or [0.0]) <= 1.0 else v for v in train_acc[:n_epochs]]
+    v_vals = [v * 100.0 if max(val_acc or [0.0]) <= 1.0 else v for v in val_acc[:n_epochs]]
+    gap = [t - v for t, v in zip(t_vals, v_vals)]
+    epochs = list(range(1, n_epochs + 1))
+
+    fig, ax = plt.subplots(figsize=(8, 4.5))
+    ax.plot(epochs, gap, color="#805ad5", lw=2.0, marker="^", markersize=3.5, label="Train - Val Accuracy Gap (%)")
+    ax.axhline(0, color="#a0aec0", linestyle="--", lw=1.0)
+
+    ax.set_title(f"Generalization Gap: {model_name}", fontsize=11, fontweight="bold")
+    ax.set_xlabel("Epochs", fontsize=10, fontweight="semibold")
+    ax.set_ylabel("Accuracy Gap (%)", fontsize=10, fontweight="semibold")
+    ax.grid(True, linestyle="--", alpha=0.5)
+    ax.legend(loc="upper left")
+
+    final_gap = gap[-1]
+    ax.annotate(
+        f"Final Gap: {final_gap:.1f}%",
+        xy=(epochs[-1], final_gap),
+        xytext=(max(1, epochs[-1] - max(1, n_epochs // 4)), final_gap + 2.0),
+        arrowprops=dict(facecolor="#805ad5", shrink=0.08, width=1, headwidth=4),
+        fontsize=8,
+        fontweight="bold",
+        color="#6b46c1",
+    )
 
     fig.tight_layout()
     plt.savefig(output_path, dpi=200, bbox_inches="tight")
@@ -459,6 +1251,94 @@ def plot_train_eval_annotated(
     plt.close(fig)
 
 
+def plot_learning_rate_curve(
+    lr_history: List[float],
+    output_path: Union[str, Path],
+    model_name: str = "Model",
+) -> None:
+    """
+    Renders epoch-wise learning rate schedule trajectory.
+    """
+    output_path = Path(output_path)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+
+    if not lr_history:
+        return
+
+    epochs = list(range(1, len(lr_history) + 1))
+    fig, ax = plt.subplots(figsize=(8, 4.5))
+    ax.plot(epochs, lr_history, color="#3182ce", lw=2.0, marker="o", markersize=3.0, label="Learning Rate")
+
+    ax.set_title(f"Learning Rate Schedule: {model_name}", fontsize=11, fontweight="bold")
+    ax.set_xlabel("Epochs", fontsize=10, fontweight="semibold")
+    ax.set_ylabel("Learning Rate", fontsize=10, fontweight="semibold")
+    ax.set_yscale("log")
+    ax.grid(True, which="both", linestyle="--", alpha=0.5)
+    ax.legend(loc="upper right")
+
+    final_lr = lr_history[-1]
+    ax.annotate(
+        f"Final LR: {final_lr:.2e}",
+        xy=(epochs[-1], final_lr),
+        xytext=(max(1, epochs[-1] - max(1, len(epochs) // 4)), final_lr * 1.5),
+        arrowprops=dict(facecolor="#3182ce", shrink=0.08, width=1, headwidth=4),
+        fontsize=8,
+        fontweight="bold",
+        color="#2b6cb0",
+    )
+
+    fig.tight_layout()
+    plt.savefig(output_path, dpi=200, bbox_inches="tight")
+    plt.close(fig)
+
+
+def plot_generalization_gap(
+    train_acc: List[float],
+    val_acc: List[float],
+    output_path: Union[str, Path],
+    model_name: str = "Model",
+) -> None:
+    """
+    Renders generalization gap (|Train Acc - Val Acc|) curve across training epochs.
+    """
+    output_path = Path(output_path)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+
+    n_epochs = min(len(train_acc), len(val_acc))
+    if n_epochs == 0:
+        return
+
+    t_vals = [v * 100.0 if max(train_acc or [0.0]) <= 1.0 else v for v in train_acc[:n_epochs]]
+    v_vals = [v * 100.0 if max(val_acc or [0.0]) <= 1.0 else v for v in val_acc[:n_epochs]]
+    gap = [t - v for t, v in zip(t_vals, v_vals)]
+    epochs = list(range(1, n_epochs + 1))
+
+    fig, ax = plt.subplots(figsize=(8, 4.5))
+    ax.plot(epochs, gap, color="#805ad5", lw=2.0, marker="^", markersize=3.5, label="Train - Val Accuracy Gap (%)")
+    ax.axhline(0, color="#a0aec0", linestyle="--", lw=1.0)
+
+    ax.set_title(f"Generalization Gap: {model_name}", fontsize=11, fontweight="bold")
+    ax.set_xlabel("Epochs", fontsize=10, fontweight="semibold")
+    ax.set_ylabel("Accuracy Gap (%)", fontsize=10, fontweight="semibold")
+    ax.grid(True, linestyle="--", alpha=0.5)
+    ax.legend(loc="upper left")
+
+    final_gap = gap[-1]
+    ax.annotate(
+        f"Final Gap: {final_gap:.1f}%",
+        xy=(epochs[-1], final_gap),
+        xytext=(max(1, epochs[-1] - max(1, n_epochs // 4)), final_gap + 2.0),
+        arrowprops=dict(facecolor="#805ad5", shrink=0.08, width=1, headwidth=4),
+        fontsize=8,
+        fontweight="bold",
+        color="#6b46c1",
+    )
+
+    fig.tight_layout()
+    plt.savefig(output_path, dpi=200, bbox_inches="tight")
+    plt.close(fig)
+
+
 def plot_per_class_metric_bars(
     per_class_dict: Dict[str, Dict[str, float]],
     metric_name: str,
@@ -519,6 +1399,94 @@ def plot_per_class_metric_bars(
     plt.close(fig)
 
 
+def plot_learning_rate_curve(
+    lr_history: List[float],
+    output_path: Union[str, Path],
+    model_name: str = "Model",
+) -> None:
+    """
+    Renders epoch-wise learning rate schedule trajectory.
+    """
+    output_path = Path(output_path)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+
+    if not lr_history:
+        return
+
+    epochs = list(range(1, len(lr_history) + 1))
+    fig, ax = plt.subplots(figsize=(8, 4.5))
+    ax.plot(epochs, lr_history, color="#3182ce", lw=2.0, marker="o", markersize=3.0, label="Learning Rate")
+
+    ax.set_title(f"Learning Rate Schedule: {model_name}", fontsize=11, fontweight="bold")
+    ax.set_xlabel("Epochs", fontsize=10, fontweight="semibold")
+    ax.set_ylabel("Learning Rate", fontsize=10, fontweight="semibold")
+    ax.set_yscale("log")
+    ax.grid(True, which="both", linestyle="--", alpha=0.5)
+    ax.legend(loc="upper right")
+
+    final_lr = lr_history[-1]
+    ax.annotate(
+        f"Final LR: {final_lr:.2e}",
+        xy=(epochs[-1], final_lr),
+        xytext=(max(1, epochs[-1] - max(1, len(epochs) // 4)), final_lr * 1.5),
+        arrowprops=dict(facecolor="#3182ce", shrink=0.08, width=1, headwidth=4),
+        fontsize=8,
+        fontweight="bold",
+        color="#2b6cb0",
+    )
+
+    fig.tight_layout()
+    plt.savefig(output_path, dpi=200, bbox_inches="tight")
+    plt.close(fig)
+
+
+def plot_generalization_gap(
+    train_acc: List[float],
+    val_acc: List[float],
+    output_path: Union[str, Path],
+    model_name: str = "Model",
+) -> None:
+    """
+    Renders generalization gap (|Train Acc - Val Acc|) curve across training epochs.
+    """
+    output_path = Path(output_path)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+
+    n_epochs = min(len(train_acc), len(val_acc))
+    if n_epochs == 0:
+        return
+
+    t_vals = [v * 100.0 if max(train_acc or [0.0]) <= 1.0 else v for v in train_acc[:n_epochs]]
+    v_vals = [v * 100.0 if max(val_acc or [0.0]) <= 1.0 else v for v in val_acc[:n_epochs]]
+    gap = [t - v for t, v in zip(t_vals, v_vals)]
+    epochs = list(range(1, n_epochs + 1))
+
+    fig, ax = plt.subplots(figsize=(8, 4.5))
+    ax.plot(epochs, gap, color="#805ad5", lw=2.0, marker="^", markersize=3.5, label="Train - Val Accuracy Gap (%)")
+    ax.axhline(0, color="#a0aec0", linestyle="--", lw=1.0)
+
+    ax.set_title(f"Generalization Gap: {model_name}", fontsize=11, fontweight="bold")
+    ax.set_xlabel("Epochs", fontsize=10, fontweight="semibold")
+    ax.set_ylabel("Accuracy Gap (%)", fontsize=10, fontweight="semibold")
+    ax.grid(True, linestyle="--", alpha=0.5)
+    ax.legend(loc="upper left")
+
+    final_gap = gap[-1]
+    ax.annotate(
+        f"Final Gap: {final_gap:.1f}%",
+        xy=(epochs[-1], final_gap),
+        xytext=(max(1, epochs[-1] - max(1, n_epochs // 4)), final_gap + 2.0),
+        arrowprops=dict(facecolor="#805ad5", shrink=0.08, width=1, headwidth=4),
+        fontsize=8,
+        fontweight="bold",
+        color="#6b46c1",
+    )
+
+    fig.tight_layout()
+    plt.savefig(output_path, dpi=200, bbox_inches="tight")
+    plt.close(fig)
+
+
 def plot_cross_model_comparison(
     models_metrics_dict: Dict[str, Dict[str, float]],
     output_path: Union[str, Path],
@@ -556,6 +1524,94 @@ def plot_cross_model_comparison(
     ax.set_ylim([0, 110])
     ax.legend(loc="upper left", frameon=True)
     ax.grid(axis="y", linestyle="--", alpha=0.6)
+
+    fig.tight_layout()
+    plt.savefig(output_path, dpi=200, bbox_inches="tight")
+    plt.close(fig)
+
+
+def plot_learning_rate_curve(
+    lr_history: List[float],
+    output_path: Union[str, Path],
+    model_name: str = "Model",
+) -> None:
+    """
+    Renders epoch-wise learning rate schedule trajectory.
+    """
+    output_path = Path(output_path)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+
+    if not lr_history:
+        return
+
+    epochs = list(range(1, len(lr_history) + 1))
+    fig, ax = plt.subplots(figsize=(8, 4.5))
+    ax.plot(epochs, lr_history, color="#3182ce", lw=2.0, marker="o", markersize=3.0, label="Learning Rate")
+
+    ax.set_title(f"Learning Rate Schedule: {model_name}", fontsize=11, fontweight="bold")
+    ax.set_xlabel("Epochs", fontsize=10, fontweight="semibold")
+    ax.set_ylabel("Learning Rate", fontsize=10, fontweight="semibold")
+    ax.set_yscale("log")
+    ax.grid(True, which="both", linestyle="--", alpha=0.5)
+    ax.legend(loc="upper right")
+
+    final_lr = lr_history[-1]
+    ax.annotate(
+        f"Final LR: {final_lr:.2e}",
+        xy=(epochs[-1], final_lr),
+        xytext=(max(1, epochs[-1] - max(1, len(epochs) // 4)), final_lr * 1.5),
+        arrowprops=dict(facecolor="#3182ce", shrink=0.08, width=1, headwidth=4),
+        fontsize=8,
+        fontweight="bold",
+        color="#2b6cb0",
+    )
+
+    fig.tight_layout()
+    plt.savefig(output_path, dpi=200, bbox_inches="tight")
+    plt.close(fig)
+
+
+def plot_generalization_gap(
+    train_acc: List[float],
+    val_acc: List[float],
+    output_path: Union[str, Path],
+    model_name: str = "Model",
+) -> None:
+    """
+    Renders generalization gap (|Train Acc - Val Acc|) curve across training epochs.
+    """
+    output_path = Path(output_path)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+
+    n_epochs = min(len(train_acc), len(val_acc))
+    if n_epochs == 0:
+        return
+
+    t_vals = [v * 100.0 if max(train_acc or [0.0]) <= 1.0 else v for v in train_acc[:n_epochs]]
+    v_vals = [v * 100.0 if max(val_acc or [0.0]) <= 1.0 else v for v in val_acc[:n_epochs]]
+    gap = [t - v for t, v in zip(t_vals, v_vals)]
+    epochs = list(range(1, n_epochs + 1))
+
+    fig, ax = plt.subplots(figsize=(8, 4.5))
+    ax.plot(epochs, gap, color="#805ad5", lw=2.0, marker="^", markersize=3.5, label="Train - Val Accuracy Gap (%)")
+    ax.axhline(0, color="#a0aec0", linestyle="--", lw=1.0)
+
+    ax.set_title(f"Generalization Gap: {model_name}", fontsize=11, fontweight="bold")
+    ax.set_xlabel("Epochs", fontsize=10, fontweight="semibold")
+    ax.set_ylabel("Accuracy Gap (%)", fontsize=10, fontweight="semibold")
+    ax.grid(True, linestyle="--", alpha=0.5)
+    ax.legend(loc="upper left")
+
+    final_gap = gap[-1]
+    ax.annotate(
+        f"Final Gap: {final_gap:.1f}%",
+        xy=(epochs[-1], final_gap),
+        xytext=(max(1, epochs[-1] - max(1, n_epochs // 4)), final_gap + 2.0),
+        arrowprops=dict(facecolor="#805ad5", shrink=0.08, width=1, headwidth=4),
+        fontsize=8,
+        fontweight="bold",
+        color="#6b46c1",
+    )
 
     fig.tight_layout()
     plt.savefig(output_path, dpi=200, bbox_inches="tight")
@@ -603,6 +1659,94 @@ def plot_modality_ablation(
     plt.close(fig)
 
 
+def plot_learning_rate_curve(
+    lr_history: List[float],
+    output_path: Union[str, Path],
+    model_name: str = "Model",
+) -> None:
+    """
+    Renders epoch-wise learning rate schedule trajectory.
+    """
+    output_path = Path(output_path)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+
+    if not lr_history:
+        return
+
+    epochs = list(range(1, len(lr_history) + 1))
+    fig, ax = plt.subplots(figsize=(8, 4.5))
+    ax.plot(epochs, lr_history, color="#3182ce", lw=2.0, marker="o", markersize=3.0, label="Learning Rate")
+
+    ax.set_title(f"Learning Rate Schedule: {model_name}", fontsize=11, fontweight="bold")
+    ax.set_xlabel("Epochs", fontsize=10, fontweight="semibold")
+    ax.set_ylabel("Learning Rate", fontsize=10, fontweight="semibold")
+    ax.set_yscale("log")
+    ax.grid(True, which="both", linestyle="--", alpha=0.5)
+    ax.legend(loc="upper right")
+
+    final_lr = lr_history[-1]
+    ax.annotate(
+        f"Final LR: {final_lr:.2e}",
+        xy=(epochs[-1], final_lr),
+        xytext=(max(1, epochs[-1] - max(1, len(epochs) // 4)), final_lr * 1.5),
+        arrowprops=dict(facecolor="#3182ce", shrink=0.08, width=1, headwidth=4),
+        fontsize=8,
+        fontweight="bold",
+        color="#2b6cb0",
+    )
+
+    fig.tight_layout()
+    plt.savefig(output_path, dpi=200, bbox_inches="tight")
+    plt.close(fig)
+
+
+def plot_generalization_gap(
+    train_acc: List[float],
+    val_acc: List[float],
+    output_path: Union[str, Path],
+    model_name: str = "Model",
+) -> None:
+    """
+    Renders generalization gap (|Train Acc - Val Acc|) curve across training epochs.
+    """
+    output_path = Path(output_path)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+
+    n_epochs = min(len(train_acc), len(val_acc))
+    if n_epochs == 0:
+        return
+
+    t_vals = [v * 100.0 if max(train_acc or [0.0]) <= 1.0 else v for v in train_acc[:n_epochs]]
+    v_vals = [v * 100.0 if max(val_acc or [0.0]) <= 1.0 else v for v in val_acc[:n_epochs]]
+    gap = [t - v for t, v in zip(t_vals, v_vals)]
+    epochs = list(range(1, n_epochs + 1))
+
+    fig, ax = plt.subplots(figsize=(8, 4.5))
+    ax.plot(epochs, gap, color="#805ad5", lw=2.0, marker="^", markersize=3.5, label="Train - Val Accuracy Gap (%)")
+    ax.axhline(0, color="#a0aec0", linestyle="--", lw=1.0)
+
+    ax.set_title(f"Generalization Gap: {model_name}", fontsize=11, fontweight="bold")
+    ax.set_xlabel("Epochs", fontsize=10, fontweight="semibold")
+    ax.set_ylabel("Accuracy Gap (%)", fontsize=10, fontweight="semibold")
+    ax.grid(True, linestyle="--", alpha=0.5)
+    ax.legend(loc="upper left")
+
+    final_gap = gap[-1]
+    ax.annotate(
+        f"Final Gap: {final_gap:.1f}%",
+        xy=(epochs[-1], final_gap),
+        xytext=(max(1, epochs[-1] - max(1, n_epochs // 4)), final_gap + 2.0),
+        arrowprops=dict(facecolor="#805ad5", shrink=0.08, width=1, headwidth=4),
+        fontsize=8,
+        fontweight="bold",
+        color="#6b46c1",
+    )
+
+    fig.tight_layout()
+    plt.savefig(output_path, dpi=200, bbox_inches="tight")
+    plt.close(fig)
+
+
 def plot_hyperparameter_trials(
     trials_list: List[Dict[str, Any]],
     output_path: Union[str, Path],
@@ -640,6 +1784,94 @@ def plot_hyperparameter_trials(
             fontsize=8,
             fontweight="semibold",
         )
+
+    fig.tight_layout()
+    plt.savefig(output_path, dpi=200, bbox_inches="tight")
+    plt.close(fig)
+
+
+def plot_learning_rate_curve(
+    lr_history: List[float],
+    output_path: Union[str, Path],
+    model_name: str = "Model",
+) -> None:
+    """
+    Renders epoch-wise learning rate schedule trajectory.
+    """
+    output_path = Path(output_path)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+
+    if not lr_history:
+        return
+
+    epochs = list(range(1, len(lr_history) + 1))
+    fig, ax = plt.subplots(figsize=(8, 4.5))
+    ax.plot(epochs, lr_history, color="#3182ce", lw=2.0, marker="o", markersize=3.0, label="Learning Rate")
+
+    ax.set_title(f"Learning Rate Schedule: {model_name}", fontsize=11, fontweight="bold")
+    ax.set_xlabel("Epochs", fontsize=10, fontweight="semibold")
+    ax.set_ylabel("Learning Rate", fontsize=10, fontweight="semibold")
+    ax.set_yscale("log")
+    ax.grid(True, which="both", linestyle="--", alpha=0.5)
+    ax.legend(loc="upper right")
+
+    final_lr = lr_history[-1]
+    ax.annotate(
+        f"Final LR: {final_lr:.2e}",
+        xy=(epochs[-1], final_lr),
+        xytext=(max(1, epochs[-1] - max(1, len(epochs) // 4)), final_lr * 1.5),
+        arrowprops=dict(facecolor="#3182ce", shrink=0.08, width=1, headwidth=4),
+        fontsize=8,
+        fontweight="bold",
+        color="#2b6cb0",
+    )
+
+    fig.tight_layout()
+    plt.savefig(output_path, dpi=200, bbox_inches="tight")
+    plt.close(fig)
+
+
+def plot_generalization_gap(
+    train_acc: List[float],
+    val_acc: List[float],
+    output_path: Union[str, Path],
+    model_name: str = "Model",
+) -> None:
+    """
+    Renders generalization gap curve across training epochs.
+    """
+    output_path = Path(output_path)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+
+    n_epochs = min(len(train_acc), len(val_acc))
+    if n_epochs == 0:
+        return
+
+    t_vals = [v * 100.0 if max(train_acc or [0.0]) <= 1.0 else v for v in train_acc[:n_epochs]]
+    v_vals = [v * 100.0 if max(val_acc or [0.0]) <= 1.0 else v for v in val_acc[:n_epochs]]
+    gap = [t - v for t, v in zip(t_vals, v_vals)]
+    epochs = list(range(1, n_epochs + 1))
+
+    fig, ax = plt.subplots(figsize=(8, 4.5))
+    ax.plot(epochs, gap, color="#805ad5", lw=2.0, marker="^", markersize=3.5, label="Train - Val Accuracy Gap (%)")
+    ax.axhline(0, color="#a0aec0", linestyle="--", lw=1.0)
+
+    ax.set_title(f"Generalization Gap: {model_name}", fontsize=11, fontweight="bold")
+    ax.set_xlabel("Epochs", fontsize=10, fontweight="semibold")
+    ax.set_ylabel("Accuracy Gap (%)", fontsize=10, fontweight="semibold")
+    ax.grid(True, linestyle="--", alpha=0.5)
+    ax.legend(loc="upper left")
+
+    final_gap = gap[-1]
+    ax.annotate(
+        f"Final Gap: {final_gap:.1f}%",
+        xy=(epochs[-1], final_gap),
+        xytext=(max(1, epochs[-1] - max(1, n_epochs // 4)), final_gap + 2.0),
+        arrowprops=dict(facecolor="#805ad5", shrink=0.08, width=1, headwidth=4),
+        fontsize=8,
+        fontweight="bold",
+        color="#6b46c1",
+    )
 
     fig.tight_layout()
     plt.savefig(output_path, dpi=200, bbox_inches="tight")

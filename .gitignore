@@ -37,3 +37,7 @@ SS/
 # Operating System files
 .DS_Store
 Thumbs.db
+
+# Local reference material and generated runtime manifests
+reference_nb/
+outputs/manifests/

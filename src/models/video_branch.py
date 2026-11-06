@@ -274,18 +274,26 @@ class MobileNetV2VideoBranch(nn.Module):
         self.last_channel = 1280
 
         loaded_torchvision = False
-        if pretrained and pretrained_path is None:
+        if pretrained_path is None:
             try:
                 import torchvision.models as models
-                try:
-                    from torchvision.models import MobileNet_V2_Weights
-                    tv_mobilenet = models.mobilenet_v2(weights=MobileNet_V2_Weights.DEFAULT)
-                except Exception:
-                    tv_mobilenet = models.mobilenet_v2(pretrained=True)
+                if pretrained:
+                    try:
+                        from torchvision.models import MobileNet_V2_Weights
+                        tv_mobilenet = models.mobilenet_v2(weights=MobileNet_V2_Weights.DEFAULT)
+                    except Exception:
+                        tv_mobilenet = models.mobilenet_v2(pretrained=True)
+                    print("[MobileNetV2VideoBranch] Initialized with official pretrained ImageNet weights via torchvision.")
+                else:
+                    try:
+                        tv_mobilenet = models.mobilenet_v2(weights=None)
+                    except Exception:
+                        tv_mobilenet = models.mobilenet_v2(pretrained=False)
+                    print("[MobileNetV2VideoBranch] Initialized unweighted torchvision MobileNetV2 architecture.")
+
                 self.backbone = tv_mobilenet.features
                 self.backbone_pool = nn.AdaptiveAvgPool2d((1, 1))
                 loaded_torchvision = True
-                print("[MobileNetV2VideoBranch] Initialized with official pretrained ImageNet weights via torchvision.")
             except Exception as e:
                 print(f"[MobileNetV2VideoBranch] torchvision load fallback ({e}). Using pure PyTorch MobileNetV2.")
 
@@ -326,15 +334,69 @@ class MobileNetV2VideoBranch(nn.Module):
         return self.temporal_fc(concat_pooled)
 
 
+class OriginalCNNVideoBranch(nn.Module):
+    """
+    Original unregularized Custom CNN baseline for MMAct video clips (B, C, T, H, W).
+    Represents the initial student model before overfitting mitigations:
+    - Standard 2D Conv layers without SpatialDropout
+    - Standard BatchNorm2d
+    - Lower dropout (0.2) on temporal projection
+    """
+
+    def __init__(
+        self,
+        in_channels: int = 3,
+        embedding_dim: int = 128,
+        dropout: float = 0.2,
+    ):
+        super().__init__()
+        self.embedding_dim = embedding_dim
+
+        self.features = nn.Sequential(
+            nn.Conv2d(in_channels, 32, kernel_size=3, stride=2, padding=1),
+            nn.BatchNorm2d(32),
+            nn.ReLU(inplace=True),
+            nn.MaxPool2d(kernel_size=2, stride=2),
+
+            nn.Conv2d(32, 64, kernel_size=3, stride=2, padding=1),
+            nn.BatchNorm2d(64),
+            nn.ReLU(inplace=True),
+            nn.MaxPool2d(kernel_size=2, stride=2),
+
+            nn.Conv2d(64, 128, kernel_size=3, stride=1, padding=1),
+            nn.BatchNorm2d(128),
+            nn.ReLU(inplace=True),
+            nn.AdaptiveAvgPool2d((1, 1)),
+        )
+
+        self.temporal_fc = nn.Sequential(
+            nn.Dropout(dropout),
+            nn.Linear(128 * 2, embedding_dim),
+            nn.BatchNorm1d(embedding_dim),
+            nn.ReLU(inplace=True),
+        )
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        b, c, t, h, w = x.shape
+        x_reshuffled = x.permute(0, 2, 1, 3, 4).contiguous().view(b * t, c, h, w)
+        frame_feats = self.features(x_reshuffled).view(b * t, 128)
+        feats_time = frame_feats.view(b, t, 128)
+
+        mean_pooled = torch.mean(feats_time, dim=1)
+        max_pooled, _ = torch.max(feats_time, dim=1)
+        concat_pooled = torch.cat([mean_pooled, max_pooled], dim=1)
+        return self.temporal_fc(concat_pooled)
+
+
 class CustomCNNVideoBranch(nn.Module):
     """
     Improved Custom CNN Video Branch for Human Activity Recognition clips (B, C, T, H, W).
     Engineered with explicit anti-overfitting regularization:
-    - Batch Normalization after every convolution
-    - Spatial Dropout2d between conv stages
+    - Batch Normalization after every convolution (bias=False)
+    - Spatial Dropout2d between conv stages (0.15, 0.20)
     - Global average pooling per frame (bottlenecked to 128 dims)
     - Temporal Mean + Max pooling across frames
-    - Higher dropout (0.4) on temporal projection to address overfitting
+    - Higher dropout (0.35-0.5) on temporal projection to address overfitting
     """
 
     def __init__(
@@ -386,4 +448,4 @@ class CustomCNNVideoBranch(nn.Module):
 
 
 # Alias for backward compatibility
-LightweightVideoBranch = CustomCNNVideoBranch
+LightweightVideoBranch = OriginalCNNVideoBranch

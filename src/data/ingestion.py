@@ -101,7 +101,7 @@ class DatasetIngestionPipeline:
 
             # Check if file is an archive
             is_zip = file_path.suffix.lower() == ".zip"
-            is_tar = file_path.name.lower().endswith((".tar.gz", ".tar"))
+            is_tar = file_path.name.lower().endswith((".tar.gz", ".tar", ".tgz"))
             is_data = file_path.suffix.lower() in [".csv", ".mp4", ".json", ".txt"]
 
             if not (is_zip or is_tar or is_data):
@@ -150,6 +150,16 @@ class DatasetIngestionPipeline:
     def _safe_extract_zip(self, zip_path: Path, file_hash: str) -> IngestionRecord:
         extracted = 0
         try:
+            free_bytes = shutil.disk_usage(self.raw_storage_dir).free
+            if free_bytes < 250 * 1024 * 1024:
+                return IngestionRecord(
+                    file_name=zip_path.name,
+                    relative_path=str(zip_path.relative_to(self.incoming_dir)),
+                    sha256=file_hash,
+                    file_size_bytes=zip_path.stat().st_size,
+                    status="quarantined",
+                    reason=f"Insufficient disk space for extraction ({free_bytes / (1024**2):.1f} MB free)",
+                )
             with zipfile.ZipFile(zip_path, "r") as zf:
                 # Check for zip bomb or malicious path traversal
                 for member in zf.infolist():
@@ -192,6 +202,16 @@ class DatasetIngestionPipeline:
     def _safe_extract_tar(self, tar_path: Path, file_hash: str) -> IngestionRecord:
         extracted = 0
         try:
+            free_bytes = shutil.disk_usage(self.raw_storage_dir).free
+            if free_bytes < 250 * 1024 * 1024:
+                return IngestionRecord(
+                    file_name=tar_path.name,
+                    relative_path=str(tar_path.relative_to(self.incoming_dir)),
+                    sha256=file_hash,
+                    file_size_bytes=tar_path.stat().st_size,
+                    status="quarantined",
+                    reason=f"Insufficient disk space for extraction ({free_bytes / (1024**2):.1f} MB free)",
+                )
             with tarfile.open(tar_path, "r:*") as tf:
                 for member in tf.getmembers():
                     target = self.raw_storage_dir / member.name

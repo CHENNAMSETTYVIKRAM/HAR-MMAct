@@ -67,3 +67,20 @@ def test_indexer_traverses_symlinks(synthetic_dataset_dir, tmp_path):
     assert report.total_sensor_files_found > 0
     assert report.paired_samples_count == 120
 
+
+def test_indexer_duplicate_recordings_prevention(tmp_path):
+    # Create dataset with duplicate recording files
+    dup_dir = tmp_path / "dup_dataset"
+    generate_synthetic_fixture(dup_dir, num_subjects=1, num_cams=1, include_test_anomalies=False)
+
+    # Intentionally duplicate a video file under an alias directory structure that maps to same key
+    vid_file = list(dup_dir.glob("**/*.mp4"))[0]
+    dup_vid = vid_file.parent / f"copy_{vid_file.name}"
+    import shutil
+    shutil.copyfile(vid_file, dup_vid)
+
+    indexer = MMActIndexer(dataset_root=dup_dir)
+    report = indexer.index()
+    # Duplicate ID should be flagged, and paired samples must not contain duplicates
+    sample_ids = [s.sample_id for s in report.paired_samples]
+    assert len(sample_ids) == len(set(sample_ids)), "Duplicate sample IDs found in paired samples!"

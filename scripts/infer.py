@@ -39,14 +39,35 @@ def main():
         print(f"[ERROR] Checkpoint not found: {ckpt_path}")
         sys.exit(1)
 
-    has_video = args.video is not None and Path(args.video).exists()
+    has_video = False
+    if args.video is not None:
+        video_path = Path(args.video)
+        if not video_path.exists():
+            print(f"[ERROR] Specified video file does not exist: {args.video}")
+            sys.exit(1)
+        has_video = True
+
     sensor_paths = {}
-    if args.sensor_phone and Path(args.sensor_phone).exists():
-        sensor_paths["acc_phone"] = Path(args.sensor_phone)
-    if args.sensor_watch and Path(args.sensor_watch).exists():
-        sensor_paths["acc_watch"] = Path(args.sensor_watch)
-    if args.sensor_gyro and Path(args.sensor_gyro).exists():
-        sensor_paths["gyro"] = Path(args.sensor_gyro)
+    if args.sensor_phone is not None:
+        p_path = Path(args.sensor_phone)
+        if not p_path.exists():
+            print(f"[ERROR] Specified sensor_phone file does not exist: {args.sensor_phone}")
+            sys.exit(1)
+        sensor_paths["acc_phone"] = p_path
+
+    if args.sensor_watch is not None:
+        w_path = Path(args.sensor_watch)
+        if not w_path.exists():
+            print(f"[ERROR] Specified sensor_watch file does not exist: {args.sensor_watch}")
+            sys.exit(1)
+        sensor_paths["acc_watch"] = w_path
+
+    if args.sensor_gyro is not None:
+        g_path = Path(args.sensor_gyro)
+        if not g_path.exists():
+            print(f"[ERROR] Specified sensor_gyro file does not exist: {args.sensor_gyro}")
+            sys.exit(1)
+        sensor_paths["gyro"] = g_path
 
     has_sensors = len(sensor_paths) > 0
 
@@ -70,11 +91,26 @@ def main():
         video_embed_dim=128,
         sensor_embed_dim=128,
         fusion_hidden_dim=128,
+        mode=saved_cfg.get("mode", "multimodal"),
         video_backbone=saved_cfg.get("video_backbone", "resnet18"),
         sensor_backbone=saved_cfg.get("sensor_backbone", "inception_time"),
         pretrained_video=False,
     )
-    model.load_state_dict(checkpoint["model_state_dict"])
+
+    # Reconstruct the exact MobileNetV2 architecture used during training.
+    if saved_cfg.get("video_backbone") in ("mobilenet_v2", "mobilenet"):
+        try:
+            import torchvision.models as tv_models
+            import torch.nn as nn
+
+            model.video_branch.backbone = tv_models.mobilenet_v2(
+                weights=None
+            ).features
+            model.video_branch.backbone_pool = nn.AdaptiveAvgPool2d((1, 1))
+        except Exception:
+            pass
+
+    model.load_state_dict(checkpoint["model_state_dict"], strict=True)
     model.to(device)
     model.eval()
 
@@ -93,15 +129,32 @@ def main():
     print(" HAR_MMAct: Inference Prediction")
     print("=" * 60)
 
-    if has_video and has_sensors:
-        print("[Mode: Multimodal Fused Inference]")
-        probs = model.predict_fused(video_tensor, sensor_tensor)[0].cpu().numpy()
-    elif has_video:
-        print("[Mode: Video-Only Inference]")
+    ckpt_mode = saved_cfg.get("mode", "multimodal")
+
+    if ckpt_mode == "video_only":
+        if not has_video:
+            print("[ERROR] Checkpoint was trained for 'video_only', but --video was not provided.")
+            sys.exit(1)
+        print(f"[Mode: Video-Only Inference ({saved_cfg.get('video_backbone', 'model')})]")
         probs = model.predict_video_only(video_tensor)[0].cpu().numpy()
-    else:
-        print("[Mode: Sensor-Only Inference]")
+
+    elif ckpt_mode == "sensor_only":
+        if not has_sensors:
+            print("[ERROR] Checkpoint was trained for 'sensor_only', but no sensor files were provided.")
+            sys.exit(1)
+        print(f"[Mode: Sensor-Only Inference ({saved_cfg.get('sensor_backbone', 'model')})]")
         probs = model.predict_sensor_only(sensor_tensor)[0].cpu().numpy()
+
+    else:  # Multimodal mode
+        if has_video and has_sensors:
+            print("[Mode: Multimodal Fused Inference]")
+            probs = model.predict_fused(video_tensor, sensor_tensor)[0].cpu().numpy()
+        elif has_video:
+            print("[Mode: Video Stream Alone (Multimodal Architecture)]")
+            probs = model.predict_video_only(video_tensor)[0].cpu().numpy()
+        else:
+            print("[Mode: Sensor Stream Alone (Multimodal Architecture)]")
+            probs = model.predict_sensor_only(sensor_tensor)[0].cpu().numpy()
 
     top_indices = np.argsort(probs)[::-1][: args.top_k]
     print(f"\nTop-{args.top_k} Activity Predictions:")
