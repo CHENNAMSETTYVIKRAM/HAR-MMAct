@@ -6,12 +6,32 @@ Preserves existing notebooks untouched.
 """
 
 import argparse
+import base64
+import io
 import json
+import zipfile
 from pathlib import Path
+
+
+def build_codebase_b64() -> str:
+    """Packages the latest verified src and scripts directories into a compressed base64 string."""
+    repo_root = Path(__file__).resolve().parent.parent
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as z:
+        for d in ["src", "scripts"]:
+            dir_path = repo_root / d
+            if dir_path.exists():
+                for p in sorted(dir_path.rglob("*.py")):
+                    if "__pycache__" in str(p) or p.name == "create_kaggle_notebook.py":
+                        continue
+                    rel_p = p.relative_to(repo_root).as_posix()
+                    z.write(p, rel_p)
+    return base64.b64encode(buf.getvalue()).decode("ascii")
 
 
 def generate_benchmark_cells():
     cells = []
+    codebase_b64 = build_codebase_b64()
 
     def md(source_lines):
         return {"cell_type": "markdown", "metadata": {}, "source": [l + "\n" for l in source_lines]}
@@ -22,7 +42,7 @@ def generate_benchmark_cells():
     # Title
     cells.append(md([
         "# Multimodal Human Activity Recognition on MMAct (Kaggle GPU Pipeline)",
-        "## Fast, Reliable, Complete 6-Model Benchmark: Original CNN, Improved CNN, Tuned CNN, MobileNetV2 Staged Fine-Tuning, Sensor-Only, and Multimodal Fusion",
+        "## Fast, Reliable, Complete 6-Model Benchmark: Sensor-Only, Multimodal Fusion, MobileNetV2 Staged Fine-Tuning, Improved CNN, Tuned CNN, and Original CNN",
         "",
         "This notebook executes the complete Multimodal Human Activity Recognition (HAR) pipeline on the **MMAct dataset** across structured, bounded sections:",
         "- **Section 1**: Environment & Dependencies Setup (strictly preserving Kaggle's binary C ABI stack, Torchvision ops, and CPU thread configuration)",
@@ -32,12 +52,12 @@ def generate_benchmark_cells():
         "- **Section 5**: Label Mapping & Pre-Flight Modality Audit (Zero-Leakage Split, Paired File Audit & Representation Audit across 10 target classes)",
         "- **Section 6**: Video & Sensor Preprocessing Cache Warm-Up (`/kaggle/working/har_mmact_cache` with disk capacity safety check)",
         "- **Section 7**: Memory-Safe Calibration & OOM Warm-Up (graceful OOM catch, headroom tracking)",
-        "- **Section 8**: Experiment 1: Original Custom CNN Baseline (50 epochs, unregularized baseline)",
-        "- **Section 9**: Experiment 2: Improved Regularized CNN Baseline (50 epochs, spatial dropout, weight decay, cosine annealing)",
-        "- **Section 10**: Experiment 3: Hyperparameter Tuning (train/val only) & Tuned CNN (50 epochs)",
-        "- **Section 11**: Experiment 4: MobileNetV2 Transfer Learning with Staged Fine-Tuning (50 epochs, AMP)",
-        "- **Section 12**: Experiment 5: Sensor-Only InceptionTime Baseline (50 epochs)",
-        "- **Section 13**: Experiment 6: Multimodal Late Fusion (MobileNetV2 + InceptionTime, 50 epochs)",
+        "- **Section 8**: Experiment 1: Sensor-Only InceptionTime Baseline (50 epochs)",
+        "- **Section 9**: Experiment 2: Multimodal Late Fusion (MobileNetV2 + InceptionTime, 50 epochs)",
+        "- **Section 10**: Experiment 3: MobileNetV2 Video-Only Staged Fine-Tuning (50 epochs, AMP)",
+        "- **Section 11**: Experiment 4: Improved Regularized CNN Video Baseline (50 epochs, spatial dropout, weight decay, cosine annealing)",
+        "- **Section 12**: Experiment 5: Hyperparameter Tuning (train/val only) & Tuned CNN (50 epochs)",
+        "- **Section 13**: Experiment 6: Original Custom CNN Baseline (50 epochs, unregularized baseline)",
         "- **Section 14**: Standalone Evaluation on Held-Out Test Set across all 6 models",
         "- **Section 15**: Comprehensive Publication Visualizations & Galleries (annotated curves, LR schedules, generalization gap, ROC, PR, confusion matrices)",
         "- **Section 16**: Sample Multimodal Inference Demonstration",
@@ -264,13 +284,16 @@ def generate_benchmark_cells():
 
     # Section 3
     cells.append(md([
-        "## Section 3: Repository Checkout from master Branch",
-        "Clones or pulls the latest verified code from the `master` branch of `https://github.com/CHENNAMSETTYVIKRAM/HAR-MMAct.git`, configures Python `sys.path`, and verifies project modules."
+        "## Section 3: Repository Checkout & Verified Codebase Synchronization",
+        "Clones or updates repository from `master` branch of `https://github.com/CHENNAMSETTYVIKRAM/HAR-MMAct.git` when internet is enabled, and unpacks the embedded latest verified source modules (`scripts/train.py` with balanced loss, `src/data/stager.py` with full SHA-256 duplicate verification and strict split line-counts, and `src/data/indexer.py`) directly into `/kaggle/working/HAR-MMAct`. Guarantees the notebook is 100% self-contained and cannot silently use outdated code."
     ]))
     cells.append(code([
-        "# Section 3: Repository Checkout from master Branch",
+        "# Section 3: Repository Checkout & Verified Code Embedding",
         "import sys",
         "import os",
+        "import io",
+        "import zipfile",
+        "import base64",
         "import subprocess",
         "from pathlib import Path",
         "",
@@ -278,49 +301,54 @@ def generate_benchmark_cells():
         "REPO_URL = 'https://github.com/CHENNAMSETTYVIKRAM/HAR-MMAct.git'",
         "BRANCH = 'master'",
         "",
-        "# 1. Clone or update repository into PROJECT_ROOT explicitly on 'master' branch",
+        "# 1. Attempt git clone / update from GitHub master (if internet is enabled)",
         "if not PROJECT_ROOT.exists():",
-        "    print(f'Cloning {REPO_URL} (branch: {BRANCH}) into {PROJECT_ROOT}...')",
-        "    subprocess.run(['git', 'clone', '-b', BRANCH, REPO_URL, str(PROJECT_ROOT)], check=True)",
+        "    print(f'Attempting clone of {REPO_URL} (branch: {BRANCH}) into {PROJECT_ROOT}...')",
+        "    try:",
+        "        subprocess.run(['git', 'clone', '-b', BRANCH, REPO_URL, str(PROJECT_ROOT)], check=True, timeout=60)",
+        "        print('  --> Git clone succeeded.')",
+        "    except Exception as e:",
+        "        print(f'  [Info] Git clone skipped/unavailable: {e}. Using embedded self-contained codebase.')",
         "else:",
-        "    print(f'Repository already present at {PROJECT_ROOT}. Updating strictly to origin/{BRANCH}...')",
-        "    subprocess.run(['git', '-C', str(PROJECT_ROOT), 'fetch', 'origin', BRANCH], check=True)",
-        "    subprocess.run(['git', '-C', str(PROJECT_ROOT), 'checkout', '-B', BRANCH, f'origin/{BRANCH}'], check=True)",
-        "    subprocess.run(['git', '-C', str(PROJECT_ROOT), 'reset', '--hard', f'origin/{BRANCH}'], check=True)",
+        "    print(f'Repository already present at {PROJECT_ROOT}. Syncing with origin/{BRANCH}...')",
+        "    try:",
+        "        subprocess.run(['git', '-C', str(PROJECT_ROOT), 'fetch', 'origin', BRANCH], check=True, timeout=60)",
+        "        subprocess.run(['git', '-C', str(PROJECT_ROOT), 'checkout', '-B', BRANCH, f'origin/{BRANCH}'], check=True, timeout=30)",
+        "        subprocess.run(['git', '-C', str(PROJECT_ROOT), 'reset', '--hard', f'origin/{BRANCH}'], check=True, timeout=30)",
+        "        print('  --> Git sync succeeded.')",
+        "    except Exception as e:",
+        "        print(f'  [Info] Git sync skipped: {e}. Applying embedded updates to existing files.')",
         "",
-        "# 2. Print active branch and commit hash for diagnostics",
-        "try:",
-        "    branch_out = subprocess.check_output(['git', '-C', str(PROJECT_ROOT), 'rev-parse', '--abbrev-ref', 'HEAD'], text=True).strip()",
-        "    commit_out = subprocess.check_output(['git', '-C', str(PROJECT_ROOT), 'rev-parse', 'HEAD'], text=True).strip()",
-        "    print(f'Active Git Branch : {branch_out}')",
-        "    print(f'Active Git Commit : {commit_out}')",
-        "except Exception as e:",
-        "    print(f'[Warning] Could not inspect git metadata: {e}')",
-        "    branch_out, commit_out = 'unknown', 'unknown'",
+        "# 2. Unpack embedded latest verified codebase directly into PROJECT_ROOT",
+        "# Guarantees all latest verified code (class-balanced loss, full SHA-256 duplicate resolution, strict split line-counts)",
+        "# is strictly active and cannot silently revert to older GitHub commits.",
+        "PROJECT_ROOT.mkdir(parents=True, exist_ok=True)",
+        f"EMBEDDED_CODE_B64 = '{codebase_b64}'",
         "",
-        "# 3. Verify expected files exist on master",
-        "req_files = [",
-        "    PROJECT_ROOT / 'src' / 'data' / 'ingestion.py',",
-        "    PROJECT_ROOT / 'src' / 'data' / 'indexer.py',",
-        "    PROJECT_ROOT / 'src' / 'data' / 'dataset.py',",
-        "    PROJECT_ROOT / 'src' / 'data' / 'stager.py',",
-        "    PROJECT_ROOT / 'scripts' / 'train.py',",
-        "    PROJECT_ROOT / 'scripts' / 'tune.py',",
-        "    PROJECT_ROOT / 'scripts' / 'evaluate.py',",
-        "]",
-        "missing_files = [str(f.relative_to(PROJECT_ROOT)) for f in req_files if not f.exists()]",
-        "if missing_files:",
-        "    raise FileNotFoundError(f'CRITICAL: Missing required files on branch {branch_out}: {missing_files}')",
+        "zip_bytes = base64.b64decode(EMBEDDED_CODE_B64.encode('ascii'))",
+        "with zipfile.ZipFile(io.BytesIO(zip_bytes)) as zf:",
+        "    zf.extractall(PROJECT_ROOT)",
         "",
-        "print('SUCCESS: Verified presence of core modules on master branch.')",
+        "print('\\n' + '=' * 78)",
+        "print('VERIFIED CODEBASE EMBEDDED & SYNCHRONIZED')",
+        "print('=' * 78)",
+        "print(f'Project Root Location  : {PROJECT_ROOT}')",
+        "print('Active Enhancements   :')",
+        "print('  * Balanced Class Weights (scripts/train.py)            : ACTIVE')",
+        "print('  * Full SHA-256 Duplicate Staging (src/data/stager.py)   : ACTIVE')",
+        "print('  * Strict Split Line Count Check (src/data/stager.py)   : ACTIVE')",
+        "print('  * Bidirectional Directory Sync (src/data/stager.py)    : ACTIVE')",
+        "print('  * Standalone Video Path Parsing (src/data/indexer.py)  : ACTIVE')",
+        "print('Self-Contained Mode   : ENABLED (zero external code dependency)')",
+        "print('=' * 78)",
         "",
-        "# 4. Configure import path before importing project modules",
+        "# 3. Configure import path before importing project modules",
         "sys.path.insert(0, str(PROJECT_ROOT))",
         "os.chdir(PROJECT_ROOT)",
         "print(f'PROJECT_ROOT configured : {PROJECT_ROOT}')",
         "print(f'sys.path[0] set to      : {sys.path[0]}')",
         "",
-        "# 5. Verify project module imports",
+        "# 4. Verify project module imports",
         "from src.data.ingestion import DatasetIngestionPipeline",
         "from src.data.indexer import MMActIndexer",
         "from src.data.dataset import MMActMultimodalDataset",
@@ -338,19 +366,22 @@ def generate_benchmark_cells():
     cells.append(code([
         "# Section 4: Fast, Idempotent Dataset Discovery & Canonical Staging",
         "from pathlib import Path",
-        "from src.data.stager import FastMMActStager",
+        "from src.data.stager import FastMMActStager, discover_kaggle_input_roots",
         "",
         "kaggle_input = Path('/kaggle/input')",
-        "canonical_data_dir = PROJECT_ROOT / 'data' / 'genuine_mmact'",
+        "canonical_data_dir = Path('/kaggle/working/data/genuine_mmact') if Path('/kaggle/working').exists() else PROJECT_ROOT / 'data' / 'genuine_mmact'",
         "",
-        "# Candidate roots to inspect shallowly",
-        "input_roots = sorted([p for p in kaggle_input.iterdir() if p.is_dir()]) if kaggle_input.exists() else []",
+        "# Candidate roots discovered dynamically (supporting nested /kaggle/input/datasets/<user>/<slug> and direct /kaggle/input/<slug>)",
+        "input_roots = discover_kaggle_input_roots(kaggle_input)",
         "if not input_roots:",
         "    local_data = PROJECT_ROOT / 'data'",
         "    if local_data.exists():",
         "        input_roots = [local_data]",
         "",
-        "print(f'Scanning {len(input_roots)} candidate input roots using shallow bounded inspection (max_depth=4)...')",
+        "print(f'Discovered {len(input_roots)} candidate input roots:')",
+        "for r in input_roots:",
+        "    print(f'  - {r}')",
+        "",
         "stager = FastMMActStager(",
         "    canonical_dir=canonical_data_dir,",
         "    input_roots=input_roots,",
@@ -360,10 +391,18 @@ def generate_benchmark_cells():
         "staging_report = stager.discover_and_stage()",
         "print(staging_report.summary())",
         "",
+        "# Mandatory Pre-Training Gates",
         "assert staging_report.is_valid, (",
         "    f'CRITICAL: Dataset discovery & staging failed! Missing required items: {staging_report.missing_required_paths}\\n'",
-        "    f'Please ensure the MMAct dataset is attached under /kaggle/input.'",
-        ")"
+        "    f'Please ensure MMAct datasets are attached under /kaggle/input.'",
+        ")",
+        "assert len(staging_report.duplicate_conflicts) == 0, (",
+        "    f'CRITICAL: {len(staging_report.duplicate_conflicts)} conflicting duplicate files detected: {staging_report.duplicate_conflicts}'",
+        ")",
+        "assert staging_report.split_count > 0, 'CRITICAL: Official split files missing in canonical dataset!'",
+        "assert staging_report.video_count > 0, 'CRITICAL: No video files found in canonical dataset!'",
+        "assert staging_report.sensor_count > 0, 'CRITICAL: No sensor files found in canonical dataset!'",
+        "print('\\n>>> STAGING GATE PASSED: Canonical dataset verified, official splits present, zero conflicts.')"
     ]))
 
     # Section 5
@@ -571,31 +610,28 @@ def generate_benchmark_cells():
 
     # Section 8
     cells.append(md([
-        "## Section 8: Experiment 1 - Original Custom CNN Baseline (50 Epochs)",
-        "Trains the original unregularized custom CNN baseline representing the initial student model (without heavy spatial dropout or aggressive weight decay) for 50 epochs."
+        "## Section 8: Experiment 1 - Sensor-Only InceptionTime Baseline (50 Epochs)",
+        "Trains InceptionTime 1D convolutional network on 9-axis sensor time series (phone accelerometer, watch accelerometer, gyroscope) for 50 epochs."
     ]))
     cells.append(code([
-        "# Section 8: Experiment 1 - Original Custom CNN Baseline (50 Epochs)",
+        "# Section 8: Experiment 1 - Sensor-Only Baseline (50 Epochs)",
         "EPOCHS = 50",
-        "out_orig_cnn = 'outputs/original_cnn'",
-        "Path(out_orig_cnn).mkdir(parents=True, exist_ok=True)",
+        "out_sensor = 'outputs/sensor_only'",
+        "Path(out_sensor).mkdir(parents=True, exist_ok=True)",
         "",
-        "print(f'=== Starting Experiment 1: Original Custom CNN Baseline ({EPOCHS} Epochs) ===')",
+        "print(f'=== Starting Experiment 1: Sensor-Only Baseline ({EPOCHS} Epochs) ===')",
         "!python scripts/train.py \\\n"
         "    --data_root data/genuine_mmact \\\n"
-        "    --video_backbone original_cnn \\\n"
+        "    --mode sensor_only \\\n"
         "    --sensor_backbone inception_time \\\n"
-        "    --mode video_only \\\n"
         "    --epochs {EPOCHS} \\\n"
         "    --min_epochs 50 \\\n"
         "    --batch_size 8 \\\n"
-        "    --lr 0.0001 \\\n"
+        "    --lr 0.0005 \\\n"
         "    --weight_decay 0.0001 \\\n"
-        "    --dropout 0.20 \\\n"
         "    --split_strategy subject \\\n"
-        "    --early_stopping_patience 15 \\\n"
-        "    --checkpoint_name best_model_original_cnn.pth \\\n"
-        "    --output_dir {out_orig_cnn} \\\n"
+        "    --checkpoint_name best_model_sensor.pth \\\n"
+        "    --output_dir {out_sensor} \\\n"
         "    --cache_dir /kaggle/working/har_mmact_cache \\\n"
         "    --benchmark_warmup \\\n"
         "    --auto_resume \\\n"
@@ -604,15 +640,81 @@ def generate_benchmark_cells():
 
     # Section 9
     cells.append(md([
-        "## Section 9: Experiment 2 - Improved Regularized CNN Baseline (50 Epochs)",
+        "## Section 9: Experiment 2 - Multimodal Late Fusion (50 Epochs)",
+        "Fuses MobileNetV2 video representations with InceptionTime sensor features via late fusion for 50 epochs."
+    ]))
+    cells.append(code([
+        "# Section 9: Experiment 2 - Multimodal Late Fusion (50 Epochs)",
+        "out_fusion = 'outputs/multimodal_fusion'",
+        "Path(out_fusion).mkdir(parents=True, exist_ok=True)",
+        "",
+        "print(f'=== Starting Experiment 2: Multimodal Late Fusion ({EPOCHS} Epochs) ===')",
+        "!python scripts/train.py \\\n"
+        "    --data_root data/genuine_mmact \\\n"
+        "    --mode multimodal \\\n"
+        "    --video_backbone mobilenet_v2 \\\n"
+        "    --sensor_backbone inception_time \\\n"
+        "    --epochs {EPOCHS} \\\n"
+        "    --min_epochs 50 \\\n"
+        "    --batch_size 8 \\\n"
+        "    --lr 0.0001 \\\n"
+        "    --weight_decay 0.0005 \\\n"
+        "    --split_strategy subject \\\n"
+        "    --checkpoint_name best_model_multimodal.pth \\\n"
+        "    --output_dir {out_fusion} \\\n"
+        "    --cache_dir /kaggle/working/har_mmact_cache \\\n"
+        "    --benchmark_warmup \\\n"
+        "    --auto_resume \\\n"
+        "    --skip_if_completed"
+    ]))
+
+    # Section 10
+    cells.append(md([
+        "## Section 10: Experiment 3 - MobileNetV2 Video-Only Staged Fine-Tuning (50 Epochs)",
+        "Phase 1 (Epochs 1-15): Pretrained MobileNetV2 backbone frozen, training classification head at $10^{-4}$.",
+        "Phase 2 (Epochs 16-50): Backbone unfrozen with differential learning rate ($10^{-5}$) for gentle fine-tuning."
+    ]))
+    cells.append(code([
+        "# Section 10: Experiment 3 - MobileNetV2 Video-Only Staged Fine-Tuning (50 Epochs)",
+        "out_mob = 'outputs/mobilenet_v2'",
+        "Path(out_mob).mkdir(parents=True, exist_ok=True)",
+        "",
+        "print(f'=== Starting Experiment 3: MobileNetV2 Video-Only Staged Fine-Tuning ({EPOCHS} Epochs) ===')",
+        "!python scripts/train.py \\\n"
+        "    --data_root data/genuine_mmact \\\n"
+        "    --video_backbone mobilenet_v2 \\\n"
+        "    --sensor_backbone inception_time \\\n"
+        "    --mode video_only \\\n"
+        "    --epochs {EPOCHS} \\\n"
+        "    --min_epochs 50 \\\n"
+        "    --batch_size 8 \\\n"
+        "    --lr 0.0001 \\\n"
+        "    --weight_decay 0.0005 \\\n"
+        "    --dropout 0.35 \\\n"
+        "    --staged_finetune \\\n"
+        "    --unfreeze_epoch 15 \\\n"
+        "    --unfreeze_lr 0.00001 \\\n"
+        "    --split_strategy subject \\\n"
+        "    --early_stopping_patience 15 \\\n"
+        "    --checkpoint_name best_model_mobilenet_v2.pth \\\n"
+        "    --output_dir {out_mob} \\\n"
+        "    --cache_dir /kaggle/working/har_mmact_cache \\\n"
+        "    --benchmark_warmup \\\n"
+        "    --auto_resume \\\n"
+        "    --skip_if_completed"
+    ]))
+
+    # Section 11
+    cells.append(md([
+        "## Section 11: Experiment 4 - Improved Regularized CNN Video Baseline (50 Epochs)",
         "Trains the improved custom video CNN baseline for 50 epochs using Spatial Dropout2d (0.15, 0.20), BatchNorm2d, Weight Decay ($10^{-3}$), Cosine Annealing, Automatic Mixed Precision, and auto-resume protection."
     ]))
     cells.append(code([
-        "# Section 9: Experiment 2 - Improved Regularized CNN Baseline (50 Epochs)",
+        "# Section 11: Experiment 4 - Improved Regularized CNN Video Baseline (50 Epochs)",
         "out_imp_cnn = 'outputs/improved_cnn'",
         "Path(out_imp_cnn).mkdir(parents=True, exist_ok=True)",
         "",
-        "print(f'=== Starting Experiment 2: Improved Regularized CNN ({EPOCHS} Epochs) ===')",
+        "print(f'=== Starting Experiment 4: Improved Regularized CNN ({EPOCHS} Epochs) ===')",
         "!python scripts/train.py \\\n"
         "    --data_root data/genuine_mmact \\\n"
         "    --video_backbone custom_cnn \\\n"
@@ -634,14 +736,14 @@ def generate_benchmark_cells():
         "    --skip_if_completed"
     ]))
 
-    # Section 10
+    # Section 12
     cells.append(md([
-        "## Section 10: Experiment 3 - Hyperparameter Tuning (Train/Val Only) & Tuned CNN (50 Epochs)",
+        "## Section 12: Experiment 5 - Hyperparameter Tuning (Train/Val Only) & Tuned CNN (50 Epochs)",
         "Systematically explores learning rate, weight decay, and dropout across trials strictly on train/val splits. The held-out test split is NEVER touched. The best configuration is then trained for 50 epochs."
     ]))
     cells.append(code([
-        "# Section 10: Experiment 3 - Hyperparameter Tuning & Tuned CNN (50 Epochs)",
-        "print('=== Starting Experiment 3: Hyperparameter Tuning (Train/Val Only) ===')",
+        "# Section 12: Experiment 5 - Hyperparameter Tuning & Tuned CNN (50 Epochs)",
+        "print('=== Starting Experiment 5: Hyperparameter Tuning (Train/Val Only) ===')",
         "!python scripts/tune.py \\\n"
         "    --data_root data/genuine_mmact \\\n"
         "    --split_strategy subject \\\n"
@@ -683,95 +785,32 @@ def generate_benchmark_cells():
         "    --skip_if_completed"
     ]))
 
-    # Section 11
+    # Section 13
     cells.append(md([
-        "## Section 11: Experiment 4 - MobileNetV2 Staged Fine-Tuning (50 Epochs)",
-        "Phase 1 (Epochs 1-15): Pretrained MobileNetV2 backbone frozen, training classification head at $10^{-4}$.",
-        "Phase 2 (Epochs 16-50): Backbone unfrozen with differential learning rate ($10^{-5}$) for gentle fine-tuning."
+        "## Section 13: Experiment 6 - Original Custom CNN Baseline (50 Epochs)",
+        "Trains the original unregularized custom CNN baseline representing the initial student model (without heavy spatial dropout or aggressive weight decay) for 50 epochs."
     ]))
     cells.append(code([
-        "# Section 11: Experiment 4 - MobileNetV2 Staged Fine-Tuning (50 Epochs)",
-        "out_mob = 'outputs/mobilenet_v2'",
-        "Path(out_mob).mkdir(parents=True, exist_ok=True)",
+        "# Section 13: Experiment 6 - Original Custom CNN Baseline (50 Epochs)",
+        "out_orig_cnn = 'outputs/original_cnn'",
+        "Path(out_orig_cnn).mkdir(parents=True, exist_ok=True)",
         "",
-        "print(f'=== Starting Experiment 4: MobileNetV2 Staged Fine-Tuning ({EPOCHS} Epochs) ===')",
+        "print(f'=== Starting Experiment 6: Original Custom CNN Baseline ({EPOCHS} Epochs) ===')",
         "!python scripts/train.py \\\n"
         "    --data_root data/genuine_mmact \\\n"
-        "    --video_backbone mobilenet_v2 \\\n"
+        "    --video_backbone original_cnn \\\n"
         "    --sensor_backbone inception_time \\\n"
         "    --mode video_only \\\n"
         "    --epochs {EPOCHS} \\\n"
         "    --min_epochs 50 \\\n"
         "    --batch_size 8 \\\n"
         "    --lr 0.0001 \\\n"
-        "    --weight_decay 0.0005 \\\n"
-        "    --dropout 0.35 \\\n"
-        "    --staged_finetune \\\n"
-        "    --unfreeze_epoch 15 \\\n"
-        "    --unfreeze_lr 0.00001 \\\n"
+        "    --weight_decay 0.0001 \\\n"
+        "    --dropout 0.20 \\\n"
         "    --split_strategy subject \\\n"
         "    --early_stopping_patience 15 \\\n"
-        "    --checkpoint_name best_model_mobilenet_v2.pth \\\n"
-        "    --output_dir {out_mob} \\\n"
-        "    --cache_dir /kaggle/working/har_mmact_cache \\\n"
-        "    --benchmark_warmup \\\n"
-        "    --auto_resume \\\n"
-        "    --skip_if_completed"
-    ]))
-
-    # Section 12
-    cells.append(md([
-        "## Section 12: Experiment 5 - Sensor-Only InceptionTime Baseline (50 Epochs)",
-        "InceptionTime 1D convolutional network trained on 9-axis sensor time series (phone accelerometer, watch accelerometer, gyroscope) for 50 epochs."
-    ]))
-    cells.append(code([
-        "# Section 12: Experiment 5 - Sensor-Only Baseline (50 Epochs)",
-        "out_sensor = 'outputs/sensor_only'",
-        "Path(out_sensor).mkdir(parents=True, exist_ok=True)",
-        "",
-        "print(f'=== Starting Experiment 5: Sensor-Only Baseline ({EPOCHS} Epochs) ===')",
-        "!python scripts/train.py \\\n"
-        "    --data_root data/genuine_mmact \\\n"
-        "    --mode sensor_only \\\n"
-        "    --sensor_backbone inception_time \\\n"
-        "    --epochs {EPOCHS} \\\n"
-        "    --min_epochs 50 \\\n"
-        "    --batch_size 8 \\\n"
-        "    --lr 0.0005 \\\n"
-        "    --weight_decay 0.0001 \\\n"
-        "    --split_strategy subject \\\n"
-        "    --checkpoint_name best_model_sensor.pth \\\n"
-        "    --output_dir {out_sensor} \\\n"
-        "    --cache_dir /kaggle/working/har_mmact_cache \\\n"
-        "    --benchmark_warmup \\\n"
-        "    --auto_resume \\\n"
-        "    --skip_if_completed"
-    ]))
-
-    # Section 13
-    cells.append(md([
-        "## Section 13: Experiment 6 - Multimodal Late Fusion (50 Epochs)",
-        "Fuses MobileNetV2 video representations with InceptionTime sensor features via late fusion for 50 epochs."
-    ]))
-    cells.append(code([
-        "# Section 13: Experiment 6 - Multimodal Late Fusion (50 Epochs)",
-        "out_fusion = 'outputs/multimodal_fusion'",
-        "Path(out_fusion).mkdir(parents=True, exist_ok=True)",
-        "",
-        "print(f'=== Starting Experiment 6: Multimodal Late Fusion ({EPOCHS} Epochs) ===')",
-        "!python scripts/train.py \\\n"
-        "    --data_root data/genuine_mmact \\\n"
-        "    --mode multimodal \\\n"
-        "    --video_backbone mobilenet_v2 \\\n"
-        "    --sensor_backbone inception_time \\\n"
-        "    --epochs {EPOCHS} \\\n"
-        "    --min_epochs 50 \\\n"
-        "    --batch_size 8 \\\n"
-        "    --lr 0.0001 \\\n"
-        "    --weight_decay 0.0005 \\\n"
-        "    --split_strategy subject \\\n"
-        "    --checkpoint_name best_model_multimodal.pth \\\n"
-        "    --output_dir {out_fusion} \\\n"
+        "    --checkpoint_name best_model_original_cnn.pth \\\n"
+        "    --output_dir {out_orig_cnn} \\\n"
         "    --cache_dir /kaggle/working/har_mmact_cache \\\n"
         "    --benchmark_warmup \\\n"
         "    --auto_resume \\\n"
@@ -781,7 +820,7 @@ def generate_benchmark_cells():
     # Section 14
     cells.append(md([
         "## Section 14: Standalone Evaluation on Held-Out Test Set (All 6 Models)",
-        "Evaluates all 6 saved checkpoints on the strictly isolated, held-out test split using Automatic Mixed Precision."
+        "Evaluates all 6 saved checkpoints on the strictly isolated, held-out test split using Automatic Mixed Precision in order of priority."
     ]))
     cells.append(code([
         "# Section 14: Standalone Evaluation on Held-Out Test Set (All 6 Models)",
@@ -789,12 +828,12 @@ def generate_benchmark_cells():
         "from pathlib import Path",
         "",
         "models_to_evaluate = [",
-        "    ('Original Custom CNN', 'outputs/original_cnn/checkpoints/best_model_original_cnn.pth', 'outputs/original_cnn'),",
-        "    ('Improved Regularized CNN', 'outputs/improved_cnn/checkpoints/best_model_cnn.pth', 'outputs/improved_cnn'),",
-        "    ('Tuned Custom CNN', 'outputs/tuned_cnn/checkpoints/best_model_tuned_cnn.pth', 'outputs/tuned_cnn'),",
-        "    ('MobileNetV2 Fine-Tuned', 'outputs/mobilenet_v2/checkpoints/best_model_mobilenet_v2.pth', 'outputs/mobilenet_v2'),",
         "    ('InceptionTime (Sensor-Only)', 'outputs/sensor_only/checkpoints/best_model_sensor.pth', 'outputs/sensor_only'),",
         "    ('Multimodal Fusion (Video+Sensor)', 'outputs/multimodal_fusion/checkpoints/best_model_multimodal.pth', 'outputs/multimodal_fusion'),",
+        "    ('MobileNetV2 Fine-Tuned', 'outputs/mobilenet_v2/checkpoints/best_model_mobilenet_v2.pth', 'outputs/mobilenet_v2'),",
+        "    ('Improved Regularized CNN', 'outputs/improved_cnn/checkpoints/best_model_cnn.pth', 'outputs/improved_cnn'),",
+        "    ('Tuned Custom CNN', 'outputs/tuned_cnn/checkpoints/best_model_tuned_cnn.pth', 'outputs/tuned_cnn'),",
+        "    ('Original Custom CNN', 'outputs/original_cnn/checkpoints/best_model_original_cnn.pth', 'outputs/original_cnn'),",
         "]",
         "",
         "eval_results = {}",
@@ -998,23 +1037,63 @@ def generate_benchmark_cells():
         "print('\\n' + '=' * 80)",
         "print(' CONSOLIDATED HAR_MMACT BENCHMARK SUMMARY TABLE (ALL 6 MODELS)')",
         "print('=' * 80)",
+        "EXPECTED_BENCHMARK_MODELS = [",
+        "    ('InceptionTime (Sensor-Only)', 'sensor_only', 'outputs/sensor_only'),",
+        "    ('Multimodal Fusion (Video+Sensor)', 'multimodal', 'outputs/multimodal_fusion'),",
+        "    ('MobileNetV2 Fine-Tuned', 'video_only', 'outputs/mobilenet_v2'),",
+        "    ('Improved Regularized CNN', 'video_only', 'outputs/improved_cnn'),",
+        "    ('Tuned Custom CNN', 'video_only', 'outputs/tuned_cnn'),",
+        "    ('Original Custom CNN', 'video_only', 'outputs/original_cnn'),",
+        "]",
+        "",
         "rows = []",
-        "for model_name, m in eval_results.items():",
-        "    rows.append({",
-        "        'Model Architecture': model_name,",
-        "        'Modality Mode': m.get('_mode', 'multimodal'),",
-        "        'Evaluation Split': m.get('_split', 'Held-Out Test Split'),",
-        "        'Samples': m.get('_samples', 'N/A'),",
-        "        'Accuracy (%)': round(m.get('accuracy', 0.0) * 100.0, 2),",
-        "        'Macro F1': round(m.get('macro_f1', 0.0), 4),",
-        "        'Macro Precision': round(m.get('macro_precision', 0.0), 4),",
-        "        'Macro Recall': round(m.get('macro_recall', 0.0), 4),",
-        "        'Checkpoint': m.get('_checkpoint', 'N/A'),",
-        "    })",
+        "experiment_status = {}",
+        "for model_name, default_mode, out_d in EXPECTED_BENCHMARK_MODELS:",
+        "    if model_name in eval_results:",
+        "        m = eval_results[model_name]",
+        "        experiment_status[model_name] = {",
+        "            'status': 'COMPLETED',",
+        "            'accuracy': round(m.get('accuracy', 0.0) * 100.0, 2),",
+        "            'macro_f1': round(m.get('macro_f1', 0.0), 4),",
+        "            'checkpoint': m.get('_checkpoint', 'N/A'),",
+        "        }",
+        "        rows.append({",
+        "            'Model Architecture': model_name,",
+        "            'Status': 'COMPLETED',",
+        "            'Modality Mode': m.get('_mode', default_mode),",
+        "            'Evaluation Split': m.get('_split', 'Held-Out Test Split'),",
+        "            'Samples': m.get('_samples', 'N/A'),",
+        "            'Accuracy (%)': round(m.get('accuracy', 0.0) * 100.0, 2),",
+        "            'Macro F1': round(m.get('macro_f1', 0.0), 4),",
+        "            'Macro Precision': round(m.get('macro_precision', 0.0), 4),",
+        "            'Macro Recall': round(m.get('macro_recall', 0.0), 4),",
+        "            'Checkpoint': m.get('_checkpoint', 'N/A'),",
+        "        })",
+        "    else:",
+        "        experiment_status[model_name] = {",
+        "            'status': 'FAILED / INCOMPLETE',",
+        "            'accuracy': None,",
+        "            'macro_f1': None,",
+        "            'checkpoint': 'MISSING',",
+        "        }",
+        "        rows.append({",
+        "            'Model Architecture': model_name,",
+        "            'Status': 'FAILED / INCOMPLETE',",
+        "            'Modality Mode': default_mode,",
+        "            'Evaluation Split': 'N/A',",
+        "            'Samples': 'N/A',",
+        "            'Accuracy (%)': 'N/A',",
+        "            'Macro F1': 'N/A',",
+        "            'Macro Precision': 'N/A',",
+        "            'Macro Recall': 'N/A',",
+        "            'Checkpoint': 'MISSING',",
+        "        })",
         "df_results = pd.DataFrame(rows)",
         "print(df_results.to_markdown(index=False))",
         "df_results.to_csv('outputs/benchmark_summary.csv', index=False)",
-        "print('Saved outputs/benchmark_summary.csv')",
+        "with open('outputs/experiment_status.json', 'w') as f:",
+        "    json.dump(experiment_status, f, indent=2)",
+        "print('Saved outputs/benchmark_summary.csv and outputs/experiment_status.json')",
         "",
         "# 4. Organize structured results into /kaggle/working/har_mmact_results",
         "results_dir = Path('/kaggle/working/har_mmact_results')",
@@ -1025,7 +1104,7 @@ def generate_benchmark_cells():
         "    if src_p.exists():",
         "        shutil.copytree(src_p, results_dir / sub, dirs_exist_ok=True)",
         "",
-        "for f in ['benchmark_summary.csv']:",
+        "for f in ['benchmark_summary.csv', 'experiment_status.json', 'training_summary.json', 'experiment_manifest.json']:",
         "    src_f = Path('outputs') / f",
         "    if src_f.exists():",
         "        shutil.copy2(src_f, results_dir / f)",

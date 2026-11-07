@@ -143,8 +143,9 @@ class MMActIndexer:
             return f"{prefix}{num}"
         return identifier.lower()
 
+    @staticmethod
     def parse_video_path(
-        self, path: Path
+        path: Path,
     ) -> Optional[Tuple[str, str, str, str, str]]:
         """
         Parses video path to extract (subject, cam, scene, session, action).
@@ -169,13 +170,13 @@ class MMActIndexer:
             (p for p in parts if re.match(r"^session_?\d+$", p)),
             None,
         )
-        action = self.normalize_action_name(path.stem)
+        action = MMActIndexer.normalize_action_name(path.stem)
 
         if subj_raw and cam_raw and scene_raw and session_raw and action:
-            subj = self.normalize_identifier(subj_raw, "subject")
-            cam = "ego" if cam_raw == "ego" else self.normalize_identifier(cam_raw, "cam")
-            scene = self.normalize_identifier(scene_raw, "scene")
-            session = self.normalize_identifier(session_raw, "session")
+            subj = MMActIndexer.normalize_identifier(subj_raw, "subject")
+            cam = "ego" if cam_raw == "ego" else MMActIndexer.normalize_identifier(cam_raw, "cam")
+            scene = MMActIndexer.normalize_identifier(scene_raw, "scene")
+            session = MMActIndexer.normalize_identifier(session_raw, "session")
             return (subj, cam, scene, session, action)
         return None
 

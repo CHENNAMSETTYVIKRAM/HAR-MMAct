@@ -103,6 +103,8 @@ def parse_args():
     parser.add_argument("--cudnn_benchmark", action="store_true", default=True, help="Enable cuDNN benchmark autotuner")
     parser.add_argument("--benchmark_warmup", action="store_true", help="Run 1-batch calibration forward/backward check before full training")
     parser.add_argument("--seed", type=int, default=42, help="Random seed")
+    parser.add_argument("--use_class_weights", action="store_true", default=True, help="Use inverse-frequency class weights in CrossEntropyLoss to boost Macro-F1 (default: True)")
+    parser.add_argument("--no_class_weights", dest="use_class_weights", action="store_false", help="Disable class weighting in CrossEntropyLoss")
     parser.add_argument("--smoke_test", action="store_true", help="Force run on synthetic data for end-to-end pipeline verification")
     return parser.parse_args()
 
@@ -394,7 +396,27 @@ def main():
     print(f"  - Total Parameters     : {total_params:,}")
     print(f"  - Trainable Parameters : {trainable_params:,}")
 
-    criterion = nn.CrossEntropyLoss()
+    # 5. Loss Function with Class Balancing & Optimizer Setup
+    if args.use_class_weights and len(train_samples) > 0:
+        num_classes = len(VERIFIED_TARGET_CLASSES)
+        class_counts = torch.zeros(num_classes, dtype=torch.float32)
+        for s in train_samples:
+            if 0 <= s.label_idx < num_classes:
+                class_counts[s.label_idx] += 1.0
+
+        present_mask = class_counts > 0
+        weights = torch.ones(num_classes, dtype=torch.float32)
+        if present_mask.any():
+            total_samples = class_counts.sum()
+            num_present = present_mask.sum()
+            weights[present_mask] = total_samples / (num_present * class_counts[present_mask])
+            weights[present_mask] = weights[present_mask] / weights[present_mask].mean()
+
+        class_weights = weights.to(device)
+        print(f"  - Balanced Class Weights : {[round(w, 3) for w in weights.cpu().tolist()]}")
+        criterion = nn.CrossEntropyLoss(weight=class_weights)
+    else:
+        criterion = nn.CrossEntropyLoss()
     optimizer = torch.optim.AdamW(
         [p for p in model.parameters() if p.requires_grad],
         lr=args.lr,
