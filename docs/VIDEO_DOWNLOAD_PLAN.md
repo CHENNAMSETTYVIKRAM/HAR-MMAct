@@ -1,8 +1,8 @@
 # MMAct Video Download & Minimal Subset Experiment Plan
 
-**Date:** 2026-11-05  
-**Workspace:** `D:\HAR_MMAct`  
-**Status:** PROPOSED PLAN — PENDING USER APPROVAL  
+**Date:** 2026-11-05
+**Workspace:** `D:\HAR_MMAct`
+**Status:** HISTORICAL RECORD (SUPERSEDED) — The external Box download plan was superseded by the Kaggle datasets integration ([trimmed-scene-video](https://www.kaggle.com/datasets/vikramche/trimmed-scene-video) and [mmact-trimmed](https://www.kaggle.com/datasets/vikramche/mmact-trimmed)). Preserved for historical archive inventory reference.
 **Target Activity Classes (10 Verified):** `crouching`, `jumping`, `kicking`, `pointing`, `running`, `sitting`, `standing`, `using_phone`, `walking`, `waving_hand`.
 
 ---

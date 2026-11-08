@@ -1,9 +1,9 @@
 # MMAct Dataset & Archive Audit
 
-**Document Version:** 1.0  
-**Date:** 2026-11-04  
-**Project:** MMAct Multimodal Human Activity Recognition  
-**Audit Script:** `scripts/audit_dataset.py`  
+**Document Version:** 1.0
+**Date:** 2026-11-04
+**Project:** MMAct Multimodal Human Activity Recognition
+**Audit Script:** `scripts/audit_dataset.py`
 
 ---
 
@@ -23,7 +23,18 @@ This document details the file-level availability, structure, modality specifica
 
 ---
 
-## 2. Inventory of Available Files in Workspace
+## 1.1 Project Kaggle Datasets (Post-Audit Availability Update)
+
+To facilitate reproducible training and avoid manual Box authorization bottlenecks, the trimmed video and sensor streams are hosted on Kaggle:
+
+1. **[Trimmed Scene Video Dataset](https://www.kaggle.com/datasets/vikramche/trimmed-scene-video)**
+   *Description:* Kaggle-hosted video dataset prepared for the project's video modality, organized by subject, camera view, scene, and session.
+2. **[MMAct Trimmed Dataset](https://www.kaggle.com/datasets/vikramche/mmact-trimmed)**
+   *Description:* Kaggle-hosted trimmed MMAct dataset used as the project's dataset source. Contains the 4 wearable inertial sensor streams (`acc_phone_clip`, `acc_watch_clip`, `gyro_clip`, `orientation_clip`), official split configuration files, and baseline clips.
+
+*Note:* These Kaggle datasets are hosted for research reproducibility and are separate from the original Box repository distribution documented in the initial audit below.
+
+---
 
 ### A. Video & Media
 | File Path | Size | Dimensions / Format | Description |

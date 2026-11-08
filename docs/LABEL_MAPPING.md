@@ -1,9 +1,9 @@
 # Target Activity Label Mapping & Verification
 
-**Document Version:** 1.0  
-**Date:** 2026-11-04  
-**Project:** MMAct Multimodal Human Activity Recognition  
-**Audit Script:** `scripts/audit_dataset.py`  
+**Document Version:** 1.0
+**Date:** 2026-11-04
+**Project:** MMAct Multimodal Human Activity Recognition
+**Audit Script:** `scripts/audit_dataset.py`
 
 ---
 
@@ -15,6 +15,10 @@ A strict label verification was conducted against the official MMAct Challenge 2
 * `challenge-main/challenge-main/evaluation/untrimmed_val_gt.json` (315 sessions, 37 unique classes)
 
 **Audit Finding:** All **10 requested target classes** exist verbatim (in snake_case) across all three official validation ground-truth files and the published ICCV 2019 MMAct paper taxonomy. No requested target classes are missing or synthetic.
+
+The corresponding trimmed video and sensor data for these 10 target classes are hosted in the project's Kaggle datasets:
+* **[Trimmed Scene Video Dataset](https://www.kaggle.com/datasets/vikramche/trimmed-scene-video)** (video modality)
+* **[MMAct Trimmed Dataset](https://www.kaggle.com/datasets/vikramche/mmact-trimmed)** (sensor and split modality)
 
 ---
 
