@@ -1,0 +1,2 @@
+Model,Modality,Split,Accuracy (%),Macro F1,Macro Precision,Macro Recall
+tcn,Sensor-Only,val,77.44,0.7538,0.7916,0.7684

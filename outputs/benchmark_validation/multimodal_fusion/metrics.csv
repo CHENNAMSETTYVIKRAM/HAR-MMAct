@@ -1,0 +1,2 @@
+Model,Modality,Split,Accuracy (%),Macro F1,Macro Precision,Macro Recall
+mobilenet_v2,Multimodal (Fused),val,80.38,0.8005,0.8509,0.7987

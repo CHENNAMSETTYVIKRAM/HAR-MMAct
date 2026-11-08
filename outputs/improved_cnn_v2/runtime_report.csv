@@ -1,0 +1,9 @@
+metric,value
+model,custom_cnn
+mode,video_only
+epochs_requested,50
+epochs_completed,50
+total_runtime_seconds,1639.94
+avg_epoch_duration_seconds,32.8
+peak_gpu_memory_mb,274.9
+best_val_f1,0.1171

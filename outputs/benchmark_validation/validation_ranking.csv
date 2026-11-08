@@ -1,0 +1,10 @@
+Rank,Model,Mode,Accuracy,Macro_F1,Macro_Precision,Macro_Recall,Samples,Split,Metrics_File
+1,Exp1 Multimodal,multimodal,0.8115384615384615,0.8057572483212543,0.8656674130645129,0.8065789473684211,780,val,outputs/benchmark_validation/exp1_multimodal/metrics.json
+2,Multimodal Fusion,multimodal,0.8038461538461539,0.800514183077615,0.8508987959261753,0.7986842105263158,780,val,outputs/benchmark_validation/multimodal_fusion/metrics.json
+3,TCN Gated Fusion,multimodal,0.7769230769230769,0.7643156391656183,0.8260875917541398,0.7710526315789472,780,val,outputs/benchmark_validation/tcn_gated_fusion/metrics.json
+4,TCN Sensor-Only,sensor_only,0.7743589743589744,0.7537824016946717,0.7916163514847726,0.768421052631579,780,val,outputs/benchmark_validation/tcn_sensor_only/metrics.json
+5,Exp2 Sensor-Only,sensor_only,0.7743589743589744,0.7488636042320252,0.8218834838381601,0.7684210526315789,780,val,outputs/benchmark_validation/exp2_sensor_only/metrics.json
+6,Experiment 7 Staged MobileNetV2,video_only,0.4858974358974359,0.5026244331689281,0.5518605877274226,0.5105687606112054,780,val,outputs/benchmark_validation/mobilenet_v2_staged_v2/metrics.json
+7,MobileNetV2 Fine-Tuned,video_only,0.3525641025641026,0.349217443588912,0.4340439152331344,0.390025466893039,780,val,outputs/benchmark_validation/mobilenet_v2/metrics.json
+8,Improved CNN v2,video_only,0.16025641025641027,0.11707361008761157,0.0951165453774562,0.20131578947368425,780,val,outputs/improved_cnn_v2/validation_metrics.json
+9,Improved CNN,video_only,0.1474358974358974,0.0980818331093541,0.1250568684443321,0.1733234295415959,780,val,outputs/benchmark_validation/improved_cnn/metrics.json

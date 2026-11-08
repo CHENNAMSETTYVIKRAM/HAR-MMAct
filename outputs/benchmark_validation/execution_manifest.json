@@ -1,0 +1,66 @@
+[
+  {
+    "name": "Exp1 Multimodal",
+    "slug": "exp1_multimodal",
+    "checkpoint": "outputs/exp1_multimodal/checkpoints/best_model.pth",
+    "mode": "multimodal",
+    "metrics_file": "outputs/benchmark_validation/exp1_multimodal/metrics.json",
+    "status": "SUCCESS"
+  },
+  {
+    "name": "Exp2 Sensor-Only",
+    "slug": "exp2_sensor_only",
+    "checkpoint": "outputs/exp2_sensor_only/checkpoints/best_model_sensor.pth",
+    "mode": "sensor_only",
+    "metrics_file": "outputs/benchmark_validation/exp2_sensor_only/metrics.json",
+    "status": "SUCCESS"
+  },
+  {
+    "name": "Improved CNN",
+    "slug": "improved_cnn",
+    "checkpoint": "outputs/improved_cnn/checkpoints/best_model_cnn.pth",
+    "mode": "video_only",
+    "metrics_file": "outputs/benchmark_validation/improved_cnn/metrics.json",
+    "status": "SUCCESS"
+  },
+  {
+    "name": "MobileNetV2 Fine-Tuned",
+    "slug": "mobilenet_v2",
+    "checkpoint": "outputs/mobilenet_v2/checkpoints/best_model_mobilenet_v2.pth",
+    "mode": "video_only",
+    "metrics_file": "outputs/benchmark_validation/mobilenet_v2/metrics.json",
+    "status": "SUCCESS"
+  },
+  {
+    "name": "Multimodal Fusion",
+    "slug": "multimodal_fusion",
+    "checkpoint": "outputs/multimodal_fusion/checkpoints/best_model_multimodal.pth",
+    "mode": "multimodal",
+    "metrics_file": "outputs/benchmark_validation/multimodal_fusion/metrics.json",
+    "status": "SUCCESS"
+  },
+  {
+    "name": "TCN Gated Fusion",
+    "slug": "tcn_gated_fusion",
+    "checkpoint": "outputs/tcn_gated_fusion/checkpoints/best_model_tcn_gated_fusion.pth",
+    "mode": "multimodal",
+    "metrics_file": "outputs/benchmark_validation/tcn_gated_fusion/metrics.json",
+    "status": "SUCCESS"
+  },
+  {
+    "name": "TCN Sensor-Only",
+    "slug": "tcn_sensor_only",
+    "checkpoint": "outputs/tcn_sensor_only/checkpoints/best_model_tcn_sensor.pth",
+    "mode": "sensor_only",
+    "metrics_file": "outputs/benchmark_validation/tcn_sensor_only/metrics.json",
+    "status": "SUCCESS"
+  },
+  {
+    "name": "Experiment 7 Staged MobileNetV2",
+    "slug": "mobilenet_v2_staged_v2",
+    "checkpoint": "outputs/mobilenet_v2_staged_v2/checkpoints/best_model_mobilenet_v2_staged.pth",
+    "mode": "video_only",
+    "metrics_file": "outputs/benchmark_validation/mobilenet_v2_staged_v2/metrics.json",
+    "status": "SUCCESS"
+  }
+]

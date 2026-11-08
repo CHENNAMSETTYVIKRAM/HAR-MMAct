@@ -1,0 +1,2 @@
+Model,Modality,Split,Accuracy (%),Macro F1,Macro Precision,Macro Recall
+inception_time,Sensor-Only,val,77.44,0.7489,0.8219,0.7684

@@ -1,0 +1,2 @@
+Model,Modality,Split,Accuracy (%),Macro F1,Macro Precision,Macro Recall
+custom_cnn,Video-Only,val,16.03,0.1171,0.0951,0.2013
