@@ -1,0 +1,9 @@
+metric,value
+model,mobilenet_v2
+mode,multimodal
+epochs_requested,50
+epochs_completed,50
+total_runtime_seconds,3505.82
+avg_epoch_duration_seconds,70.12
+peak_gpu_memory_mb,1341.1
+best_val_f1,0.7643

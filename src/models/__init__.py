@@ -8,7 +8,7 @@ from src.models.video_branch import (
     CustomCNNVideoBranch,
     MobileNetV2VideoBranch,
 )
-from src.models.sensor_branch import InceptionTimeSensorBranch, Sensor1DCNNBranch
+from src.models.sensor_branch import InceptionTimeSensorBranch, Sensor1DCNNBranch, TemporalConvSensorBranch
 from src.models.fusion_model import MultimodalHARModel
 
 __all__ = [
@@ -18,5 +18,6 @@ __all__ = [
     "MobileNetV2VideoBranch",
     "InceptionTimeSensorBranch",
     "Sensor1DCNNBranch",
+    "TemporalConvSensorBranch",
     "MultimodalHARModel",
 ]

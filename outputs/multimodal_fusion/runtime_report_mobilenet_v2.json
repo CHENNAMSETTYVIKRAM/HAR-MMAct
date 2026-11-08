@@ -1,0 +1,10 @@
+{
+  "model": "mobilenet_v2",
+  "mode": "multimodal",
+  "epochs_requested": 50,
+  "epochs_completed": 50,
+  "total_runtime_seconds": 3702.18,
+  "avg_epoch_duration_seconds": 74.04,
+  "peak_gpu_memory_mb": 1341.1,
+  "best_val_f1": 0.8009
+}
