@@ -1,0 +1,5 @@
+trial_id,name,lr,weight_decay,dropout,val_accuracy,val_macro_f1,duration_sec
+1,Baseline Regularized,0.0001,0.001,0.35,15.9,0.0274,349.4
+2,Higher Learning Rate,0.0003,0.001,0.35,15.51,0.0815,344.5
+3,Heavy Regularization,0.0001,0.005,0.45,10.51,0.0504,343.9
+4,Fine-Grained Low LR,5e-05,0.0005,0.25,13.97,0.0737,345.0
