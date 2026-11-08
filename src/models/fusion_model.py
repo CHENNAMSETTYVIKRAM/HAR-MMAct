@@ -14,7 +14,7 @@ from src.models.video_branch import (
     CustomCNNVideoBranch,
     MobileNetV2VideoBranch,
 )
-from src.models.sensor_branch import InceptionTimeSensorBranch, Sensor1DCNNBranch
+from src.models.sensor_branch import InceptionTimeSensorBranch, Sensor1DCNNBranch, TemporalConvSensorBranch
 
 
 class MultimodalHARModel(nn.Module):
@@ -39,12 +39,14 @@ class MultimodalHARModel(nn.Module):
         pretrained_video: bool = True,
         pretrained_path: str = "outputs/pretrained/resnet18.pth",
         freeze_video_backbone: bool = False,
+        fusion_strategy: str = "concat",
     ):
         super().__init__()
         self.num_classes = num_classes
         self.mode = mode
         self.video_backbone_name = video_backbone
         self.sensor_backbone_name = sensor_backbone
+        self.fusion_strategy = fusion_strategy
 
         # Video branch initialization
         if video_backbone in ["mobilenet_v2", "mobilenet"]:
@@ -81,24 +83,34 @@ class MultimodalHARModel(nn.Module):
         # Sensor branch initialization
         if sensor_backbone == "inception_time":
             self.sensor_branch = InceptionTimeSensorBranch(
-                in_channels=sensor_channels,
-                embedding_dim=sensor_embed_dim,
-                dropout=dropout,
+                in_channels=sensor_channels, embedding_dim=sensor_embed_dim, dropout=dropout
+            )
+        elif sensor_backbone == "tcn":
+            self.sensor_branch = TemporalConvSensorBranch(
+                in_channels=sensor_channels, embedding_dim=sensor_embed_dim, dropout=dropout
             )
         else:
             self.sensor_branch = Sensor1DCNNBranch(
-                in_channels=sensor_channels,
-                embedding_dim=sensor_embed_dim,
-                dropout=dropout,
+                in_channels=sensor_channels, embedding_dim=sensor_embed_dim, dropout=dropout
             )
 
         # Multimodal fusion classifier
         total_embed_dim = video_embed_dim + sensor_embed_dim
+        if fusion_strategy not in {"concat", "gated"}:
+            raise ValueError(f"Unsupported fusion_strategy={fusion_strategy!r}")
+        if fusion_strategy == "gated":
+            self.fusion_gate = nn.Sequential(
+                nn.Linear(total_embed_dim, fusion_hidden_dim),
+                nn.GELU(),
+                nn.Linear(fusion_hidden_dim, 2),
+            )
+        else:
+            self.fusion_gate = None
         self.fusion_classifier = nn.Sequential(
             nn.Dropout(dropout),
             nn.Linear(total_embed_dim, fusion_hidden_dim),
-            nn.BatchNorm1d(fusion_hidden_dim),
-            nn.ReLU(inplace=True),
+            nn.LayerNorm(fusion_hidden_dim),
+            nn.GELU(),
             nn.Dropout(dropout),
             nn.Linear(fusion_hidden_dim, num_classes),
         )
@@ -156,7 +168,12 @@ class MultimodalHARModel(nn.Module):
                 raise ValueError("Both video and sensor tensors required for multimodal fusion.")
             v_embed = self.video_branch(video)
             s_embed = self.sensor_branch(sensor)
-            fused = torch.cat([v_embed, s_embed], dim=1)
+            if self.fusion_gate is None:
+                fused = torch.cat([v_embed, s_embed], dim=1)
+            else:
+                joined = torch.cat([v_embed, s_embed], dim=1)
+                gate = torch.softmax(self.fusion_gate(joined), dim=1)
+                fused = torch.cat([v_embed * gate[:, 0:1], s_embed * gate[:, 1:2]], dim=1)
             return self.fusion_classifier(fused)
 
     @torch.no_grad()

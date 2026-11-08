@@ -83,7 +83,8 @@ def parse_args():
     parser.add_argument("--partition_val_for_test", action="store_true", help="Opt-in: Partition validation recordings into disjoint val and test sets (default: False)")
     parser.add_argument("--mode", type=str, default="multimodal", choices=["multimodal", "video_only", "sensor_only"], help="Model mode")
     parser.add_argument("--video_backbone", type=str, default="cnn", choices=["cnn", "custom_cnn", "original_cnn", "improved_cnn", "mobilenet_v2", "resnet18", "lightweight"], help="Video backbone")
-    parser.add_argument("--sensor_backbone", type=str, default="inception_time", choices=["inception_time", "cnn1d"], help="Sensor backbone")
+    parser.add_argument("--sensor_backbone", type=str, default="inception_time", choices=["inception_time", "cnn1d", "tcn"], help="Sensor backbone")
+    parser.add_argument("--fusion_strategy", type=str, default="concat", choices=["concat", "gated"], help="Multimodal fusion strategy")
     parser.add_argument("--freeze_video", action="store_true", help="Freeze video backbone feature extractor")
     parser.add_argument("--staged_finetune", action="store_true", help="Enable staged fine-tuning for transfer learning (frozen head first, then unfreeze backbone)")
     parser.add_argument("--unfreeze_epoch", type=int, default=15, help="Epoch to unfreeze video backbone in staged fine-tuning")
@@ -272,6 +273,25 @@ def main():
     print(f"\n[Step 1] Indexing dataset at: {data_path}")
     indexer = MMActIndexer(dataset_root=data_path)
     report = indexer.index()
+    # Filter missing or empty required sensor files before splitting.
+    required_sensor_modalities = ['acc_phone', 'acc_watch', 'gyro']
+    usable_samples = []
+    for sample in report.paired_samples:
+        valid = True
+        for modality in required_sensor_modalities:
+            sensor_path = sample.sensor_paths.get(modality)
+            if sensor_path is None:
+                valid = False
+                break
+            sensor_path = Path(sensor_path)
+            if not sensor_path.is_file() or sensor_path.stat().st_size == 0:
+                valid = False
+                break
+        if valid:
+            usable_samples.append(sample)
+    print(f'Indexed samples: {len(report.paired_samples)}')
+    print(f'Usable samples: {len(usable_samples)}')
+    print(f'Excluded samples: {len(report.paired_samples) - len(usable_samples)}')
 
     print(f"  - Total Videos Scanned   : {report.total_video_files_found}")
     print(f"  - Total Sensors Scanned  : {report.total_sensor_files_found}")
@@ -295,7 +315,7 @@ def main():
         seed=args.seed,
     )
     splitter = DatasetSplitter(split_cfg, dataset_root=data_path)
-    train_samples, val_samples, test_samples = splitter.split(report.paired_samples)
+    train_samples, val_samples, test_samples = splitter.split(usable_samples)
 
     if splitter.last_audit:
         print(splitter.last_audit.summary())
@@ -389,6 +409,7 @@ def main():
         pretrained_video=True,
         pretrained_path="outputs/pretrained/resnet18.pth",
         freeze_video_backbone=freeze_video,
+        fusion_strategy=args.fusion_strategy,
     ).to(device)
 
     total_params = sum(p.numel() for p in model.parameters())
@@ -474,10 +495,56 @@ def main():
         print(f"\n[Resume] Loading checkpoint from: {args.resume}")
         resume_ckpt = torch.load(args.resume, map_location=device)
         model.load_state_dict(resume_ckpt["model_state_dict"])
+
+        # Reconstruct the staged fine-tuning optimizer before restoring
+        # a checkpoint saved after the backbone was unfrozen.
+        resume_epoch = int(resume_ckpt.get("epoch", 0))
+
+        if args.staged_finetune and resume_epoch >= args.unfreeze_epoch:
+            print("[Resume] Reconstructing the two-group fine-tuning optimizer...")
+
+            for p in model.video_branch.backbone.parameters():
+                p.requires_grad = True
+
+            backbone_params = list(model.video_branch.backbone.parameters())
+            backbone_ids = set(id(p) for p in backbone_params)
+            head_params = [
+                p for p in model.parameters()
+                if id(p) not in backbone_ids and p.requires_grad
+            ]
+
+            optimizer = torch.optim.AdamW([
+                {
+                    "params": backbone_params,
+                    "lr": args.unfreeze_lr,
+                    "weight_decay": args.weight_decay,
+                },
+                {
+                    "params": head_params,
+                    "lr": args.lr,
+                    "weight_decay": args.weight_decay,
+                },
+            ])
+
+            scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
+                optimizer,
+                T_max=max(1, args.epochs - args.unfreeze_epoch + 1),
+                eta_min=1e-6,
+            )
+
+            print(
+                f"[Resume] Optimizer groups reconstructed: "
+                f"{len(optimizer.param_groups)} "
+                f"(backbone={len(backbone_params)}, heads={len(head_params)})"
+            )
+
         if "optimizer_state_dict" in resume_ckpt:
             optimizer.load_state_dict(resume_ckpt["optimizer_state_dict"])
+            print("[Resume] Optimizer state restored successfully.")
+
         if "scheduler_state_dict" in resume_ckpt and resume_ckpt["scheduler_state_dict"] and scheduler:
             scheduler.load_state_dict(resume_ckpt["scheduler_state_dict"])
+            print("[Resume] Scheduler state restored successfully.")
         if "scaler_state_dict" in resume_ckpt and resume_ckpt["scaler_state_dict"] and scaler:
             scaler.load_state_dict(resume_ckpt["scaler_state_dict"])
         start_epoch = resume_ckpt.get("epoch", 0) + 1

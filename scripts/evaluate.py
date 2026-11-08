@@ -64,6 +64,7 @@ def parse_args():
     )
     parser.add_argument("--split_dir", type=str, default=None, help="Directory containing official MMAct split files")
     parser.add_argument("--partition_val_for_test", action="store_true", help="Opt-in: Partition validation recordings into disjoint val and test sets (default: False)")
+    parser.add_argument("--eval_split", type=str, default="auto", choices=["auto", "val", "test"], help="Evaluate validation candidates or held-out test winner")
     parser.add_argument("--batch_size", type=int, default=8, help="Batch size")
     parser.add_argument("--cache_dir", type=str, default=None, help="Cache directory for preprocessed tensors")
     parser.add_argument("--output_file", type=str, default="outputs/metrics.json", help="Path to save evaluation metrics")
@@ -99,6 +100,7 @@ def load_model_from_checkpoint(ckpt_path, device, classes):
         video_backbone=saved_cfg.get("video_backbone", "resnet18"),
         sensor_backbone=saved_cfg.get("sensor_backbone", "inception_time"),
         pretrained_video=False,
+        fusion_strategy=saved_cfg.get("fusion_strategy", "concat"),
     )
 
     if saved_cfg.get("video_backbone") in ("mobilenet_v2", "mobilenet"):
@@ -222,21 +224,48 @@ def main():
         split_dir=Path(args.split_dir) if args.split_dir else None,
         dataset_root=data_root,
     )
-    splitter = DatasetSplitter(split_cfg, dataset_root=data_root)
-    train_samples, val_samples, test_samples = splitter.split(report.paired_samples)
+    # Match the training notebook's required-modality filter exactly.
+    required_modalities = ("acc_phone", "acc_watch", "gyro")
+    valid_samples = []
+    rejected_samples = []
+    for sample in report.paired_samples:
+        valid = True
+        for modality in required_modalities:
+            sensor_path = sample.sensor_paths.get(modality)
+            if not sensor_path:
+                valid = False
+                break
+            sensor_file = Path(sensor_path)
+            if not sensor_file.is_file() or sensor_file.stat().st_size == 0:
+                valid = False
+                break
+        (valid_samples if valid else rejected_samples).append(sample)
 
-    if len(test_samples) > 0:
+    if not valid_samples:
+        raise RuntimeError("No samples remain after required sensor-file validation.")
+
+    splitter = DatasetSplitter(split_cfg, dataset_root=data_root)
+    train_samples, val_samples, test_samples = splitter.split(valid_samples)
+
+    requested_split = args.eval_split
+    if requested_split == "auto":
+        requested_split = "test" if len(test_samples) > 0 else "val"
+
+    if requested_split == "test":
+        if not test_samples:
+            raise RuntimeError("Test split requested but splitter produced no test samples.")
         eval_samples = test_samples
         eval_split_name = "test"
         eval_split_desc = (
             "Custom Held-Out Test Partition (Session-Disjoint from Val)"
-            if partition_test
-            else "Held-Out Test Split"
+            if partition_test else "Held-Out Test Split"
         )
     else:
+        if not val_samples:
+            raise RuntimeError("Validation split requested but splitter produced no validation samples.")
         eval_samples = val_samples
         eval_split_name = "val"
-        eval_split_desc = "Official MMAct Validation Split"
+        eval_split_desc = "Validation Split (used for model selection)"
     print(f"Evaluating on {eval_split_desc} ({eval_split_name}) ({len(eval_samples)} samples)...")
 
     # Select evaluation device before creating the DataLoader
@@ -280,6 +309,8 @@ def main():
         "eval_split": eval_split_name,
         "eval_split_description": eval_split_desc,
         "eval_samples_count": len(eval_samples),
+        "rejected_missing_required_sensor_samples": len(rejected_samples),
+        "requested_eval_split": args.eval_split,
         "train_samples_count": len(train_samples),
         "val_samples_count": len(val_samples),
         "test_samples_count": len(test_samples),

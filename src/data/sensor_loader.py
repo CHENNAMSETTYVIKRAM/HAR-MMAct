@@ -157,11 +157,7 @@ class SensorLoader:
             primary_df = primary_df.join(sec_df, how="left")
 
         # Fill resampled frequencies (e.g. 50 Hz gyro joined onto 100 Hz primary)
-        if self.config.fill_strategy == "bfill":
-            primary_df = primary_df.bfill().ffill()
-        else:
-            primary_df = primary_df.interpolate(method="linear").bfill().ffill()
-
+        primary_df = primary_df.bfill()
         primary_df = primary_df.dropna()
         return primary_df
 

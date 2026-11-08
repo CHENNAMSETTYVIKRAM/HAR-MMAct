@@ -1,0 +1,10 @@
+{
+  "model": "cnn",
+  "mode": "sensor_only",
+  "epochs_requested": 50,
+  "epochs_completed": 50,
+  "total_runtime_seconds": 1727.95,
+  "avg_epoch_duration_seconds": 34.56,
+  "peak_gpu_memory_mb": 62.1,
+  "best_val_f1": 0.7538
+}

@@ -161,3 +161,57 @@ class Sensor1DCNNBranch(nn.Module):
         out = self.conv3(out)
         out = out.squeeze(-1)
         return self.fc(out)
+
+
+class TemporalResidualBlock(nn.Module):
+    """Dilated residual temporal block; preserves sequence order and receptive field."""
+    def __init__(self, channels: int, dilation: int, dropout: float = 0.15):
+        super().__init__()
+        padding = dilation
+        self.net = nn.Sequential(
+            nn.Conv1d(channels, channels, kernel_size=3, padding=padding,
+                      dilation=dilation, bias=False),
+            nn.BatchNorm1d(channels),
+            nn.GELU(),
+            nn.Dropout(dropout),
+            nn.Conv1d(channels, channels, kernel_size=3, padding=padding,
+                      dilation=dilation, bias=False),
+            nn.BatchNorm1d(channels),
+        )
+        self.activation = nn.GELU()
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        return self.activation(x + self.net(x))
+
+
+class TemporalConvSensorBranch(nn.Module):
+    """TCN sensor encoder with dilated residual blocks and attentive temporal pooling."""
+    def __init__(self, in_channels: int = 9, embedding_dim: int = 128,
+                 hidden_channels: int = 96, dropout: float = 0.2):
+        super().__init__()
+        self.embedding_dim = embedding_dim
+        self.stem = nn.Sequential(
+            nn.Conv1d(in_channels, hidden_channels, kernel_size=5, padding=2, bias=False),
+            nn.BatchNorm1d(hidden_channels),
+            nn.GELU(),
+        )
+        self.temporal = nn.Sequential(
+            TemporalResidualBlock(hidden_channels, dilation=1, dropout=dropout),
+            TemporalResidualBlock(hidden_channels, dilation=2, dropout=dropout),
+            TemporalResidualBlock(hidden_channels, dilation=4, dropout=dropout),
+        )
+        self.attention = nn.Conv1d(hidden_channels, 1, kernel_size=1)
+        self.projection = nn.Sequential(
+            nn.Dropout(dropout),
+            nn.Linear(hidden_channels * 3, embedding_dim),
+            nn.LayerNorm(embedding_dim),
+            nn.GELU(),
+        )
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        h = self.temporal(self.stem(x))
+        weights = torch.softmax(self.attention(h), dim=-1)
+        attended = torch.sum(h * weights, dim=-1)
+        mean = h.mean(dim=-1)
+        maximum = h.amax(dim=-1)
+        return self.projection(torch.cat([attended, mean, maximum], dim=1))
