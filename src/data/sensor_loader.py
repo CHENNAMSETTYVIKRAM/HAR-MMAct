@@ -157,7 +157,26 @@ class SensorLoader:
             primary_df = primary_df.join(sec_df, how="left")
 
         # Fill resampled frequencies (e.g. 50 Hz gyro joined onto 100 Hz primary)
+        # 1. Backward-fill (bfill): resamples 50 Hz observations onto intermediate 100 Hz timestamps,
+        # matching official MMAct time_series_classifiers.py datetime_merging logic.
         primary_df = primary_df.bfill()
+
+        # 2. Bounded trailing fill:
+        # Quantization between 100 Hz primary (10 ms) and 50 Hz secondary (20 ms)
+        # can leave at most 1 secondary period (2 primary samples = 20 ms) unobserved at trailing boundary.
+        # When configured ('bfill_ffill_bounded' or 'bounded'), bounded filling preserves legitimate boundary
+        # samples without propagating stale values across large missing intervals.
+        fill_strat = getattr(self.config, "fill_strategy", "bfill")
+        if fill_strat in ("bfill_ffill_bounded", "bounded", "bfill_ffill"):
+            limit = getattr(self.config, "max_ffill_limit", None)
+            if limit is None:
+                min_sec_rate = min(
+                    (SENSOR_RATES_HZ.get(m, 50) for m in dfs.keys() if m != primary_mod),
+                    default=50,
+                )
+                limit = max(1, int(round(self.config.primary_rate_hz / min_sec_rate)))
+            primary_df = primary_df.ffill(limit=limit)
+
         primary_df = primary_df.dropna()
         return primary_df
 
