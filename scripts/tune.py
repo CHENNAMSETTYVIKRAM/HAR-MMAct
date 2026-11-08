@@ -164,8 +164,42 @@ def main():
         print("[ERROR] No paired samples found.")
         sys.exit(1)
 
+    # Remove samples with missing or empty required sensor files.
+    required_modalities = ("acc_phone", "acc_watch", "gyro")
+    original_count = len(report.paired_samples)
+    valid_samples = []
+    rejected_samples = []
+
+    for sample in report.paired_samples:
+        valid = True
+
+        for modality in required_modalities:
+            sensor_path = sample.sensor_paths.get(modality)
+
+            if not sensor_path:
+                valid = False
+                break
+
+            sensor_file = Path(sensor_path)
+            if not sensor_file.is_file() or sensor_file.stat().st_size == 0:
+                valid = False
+                break
+
+        if valid:
+            valid_samples.append(sample)
+        else:
+            rejected_samples.append(sample.sample_id)
+
+    print(f"  - Samples before sensor validation: {original_count}")
+    print(f"  - Samples rejected (missing/empty sensors): {len(rejected_samples)}")
+    print(f"  - Samples retained: {len(valid_samples)}")
+
+    if not valid_samples:
+        print("[ERROR] No valid samples remain after sensor validation.")
+        sys.exit(1)
+
     splitter = DatasetSplitter(SplitConfig(split_strategy=args.split_strategy))
-    train_samples, val_samples, test_samples = splitter.split(report.paired_samples)
+    train_samples, val_samples, test_samples = splitter.split(valid_samples)
 
     print(f"\nDataset Partitions:")
     print(f"  - Train Partition (Used for fitting)     : {len(train_samples)} samples")

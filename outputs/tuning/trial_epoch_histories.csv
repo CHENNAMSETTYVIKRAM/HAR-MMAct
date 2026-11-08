@@ -1,0 +1,41 @@
+trial_id,trial_name,epoch,train_loss,train_acc,val_loss,val_acc,val_f1
+1,Baseline Regularized,1,2.3858,11.44,2.2884,15.9,0.0274
+1,Baseline Regularized,2,2.3491,12.09,2.2814,15.9,0.0274
+1,Baseline Regularized,3,2.338,12.73,2.28,15.9,0.0274
+1,Baseline Regularized,4,2.321,12.96,2.2796,15.9,0.0555
+1,Baseline Regularized,5,2.2942,13.6,2.284,10.0,0.021
+1,Baseline Regularized,6,2.2827,14.44,2.2861,9.74,0.0193
+1,Baseline Regularized,7,2.2602,15.1,2.2777,14.23,0.0555
+1,Baseline Regularized,8,2.251,14.76,2.278,11.03,0.0324
+1,Baseline Regularized,9,2.2375,15.47,2.2831,11.54,0.0369
+1,Baseline Regularized,10,2.2447,14.41,2.276,12.95,0.0473
+2,Higher Learning Rate,1,2.3638,11.7,2.2964,9.74,0.0178
+2,Higher Learning Rate,2,2.312,14.1,2.2983,9.87,0.0246
+2,Higher Learning Rate,3,2.237,15.1,2.3082,9.49,0.0262
+2,Higher Learning Rate,4,2.1777,15.39,2.2857,11.03,0.0334
+2,Higher Learning Rate,5,2.1651,15.55,2.238,13.46,0.0674
+2,Higher Learning Rate,6,2.1404,14.99,2.2675,12.82,0.0827
+2,Higher Learning Rate,7,2.1379,15.15,2.236,14.23,0.0935
+2,Higher Learning Rate,8,2.1351,14.91,2.1917,15.51,0.0815
+2,Higher Learning Rate,9,2.1312,15.49,2.2097,15.13,0.1075
+2,Higher Learning Rate,10,2.1152,16.28,2.2385,13.33,0.0971
+3,Heavy Regularization,1,2.4014,10.2,2.318,9.74,0.0178
+3,Heavy Regularization,2,2.3649,11.59,2.296,9.74,0.0178
+3,Heavy Regularization,3,2.3576,12.7,2.29,9.74,0.0266
+3,Heavy Regularization,4,2.3416,12.57,2.2848,9.74,0.0331
+3,Heavy Regularization,5,2.3331,12.62,2.2846,10.51,0.0504
+3,Heavy Regularization,6,2.3315,12.78,2.2769,9.62,0.0254
+3,Heavy Regularization,7,2.3323,13.36,2.2817,9.74,0.033
+3,Heavy Regularization,8,2.3191,13.39,2.2787,10.0,0.0794
+3,Heavy Regularization,9,2.3098,14.12,2.269,10.26,0.0525
+3,Heavy Regularization,10,2.3124,14.1,2.2768,10.0,0.0409
+4,Fine-Grained Low LR,1,2.3807,10.07,2.3125,9.74,0.0178
+4,Fine-Grained Low LR,2,2.3628,11.01,2.3007,9.74,0.0401
+4,Fine-Grained Low LR,3,2.3381,12.31,2.2921,11.28,0.0595
+4,Fine-Grained Low LR,4,2.3223,12.73,2.2844,13.97,0.0737
+4,Fine-Grained Low LR,5,2.326,13.15,2.2887,11.28,0.0383
+4,Fine-Grained Low LR,6,2.3097,13.49,2.2821,11.15,0.0431
+4,Fine-Grained Low LR,7,2.3003,14.23,2.2922,9.74,0.0197
+4,Fine-Grained Low LR,8,2.3048,13.41,2.2857,10.26,0.0366
+4,Fine-Grained Low LR,9,2.2971,13.2,2.2817,11.28,0.0357
+4,Fine-Grained Low LR,10,2.2956,14.47,2.2805,11.92,0.0499
