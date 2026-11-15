@@ -1,31 +1,34 @@
 # HAR-MMAct: Multimodal Human Activity Recognition - Final Project Report
 
-**Document Version:** 1.0
-**Date:** 2026-11-08
+**Document Version:** 1.1
+**Date:** 2026-11-16
 **Repository:** `https://github.com/CHENNAMSETTYVIKRAM/HAR-MMAct`
-**Current Branch:** `master` (Commit `fe8aad4` / `40fb91e`)
+**Current Branch:** `master`
 **Project Workspace:** `D:\HAR_MMAct`
 
 ---
 
 ## 1. Executive Summary
 
-This report documents the design, implementation, benchmark validation, and final held-out test evaluation of the **HAR-MMAct** software-only multimodal Human Activity Recognition system. The framework processes synchronized video clips and wearable inertial time-series data from the [MMAct dataset](https://mmact19.github.io/challenge/), targeting 10 verified physical activity classes.
+This report documents the design, implementation, validation benchmark, and held-out test evaluation of the **HAR-MMAct** software-only multimodal Human Activity Recognition system. The framework combines video clips and wearable inertial sensor time series from the genuine MMAct dataset and targets 10 verified activity classes.
 
-### Key Accomplishments & Verified Results:
-1. **Zero-Leakage Multi-Modal Pipeline:** Built an end-to-end ingestion and preprocessing pipeline that pairs trimmed MP4 videos with 9-axis wearable sensor recordings (phone accelerometer, watch accelerometer, gyroscope), strictly adhering to official MMAct timegrid and backward-fill alignment conventions.
-2. **Comprehensive 9-Model Validation Benchmark:** Evaluated multimodal, sensor-only, and video-only architectures across 9 distinct experimental configurations on a consistent validation partition ($N=780$ samples, 124 recordings).
-   - **Top Performing Model:** `exp1_multimodal` (MobileNetV2 video branch + InceptionTime sensor branch with late fusion) achieved **81.15% Validation Accuracy** and **0.8058 Macro F1**.
-   - **Multimodal Synergy:** Fused models consistently outperformed unimodal baselines by +3.7% over sensor-only (77.44% acc) and +32.6% over video-only (48.59% acc).
-3. **Validation-Driven Model Selection:** `exp1_multimodal` was selected strictly based on validation benchmark performance (with test data strictly sequestered).
-4. **Locked Final Held-Out Test Evaluation:** Evaluated once on the independent held-out test split ($N=852$ samples, 132 recordings), achieving:
-   - **Test Accuracy:** **77.23%**
-   - **Test Macro F1:** **0.7602**
-   - **Test Macro Precision:** **0.7888**
-   - **Test Macro Recall:** **0.7695**
-   - **Test ROC-AUC (One-vs-Rest):** **0.9673**
-   - **Test Macro Average Precision (PR-AUC):** **0.8611**
-5. **Reproducibility & Open Data Hosting:** Cloud-executable Kaggle notebooks and CLI scripts provide 100% deterministic reproduction from publicly accessible Kaggle datasets.
+### Verified Accomplishments and Results
+
+1. **Multimodal data pipeline:** Implemented video and sensor ingestion, preprocessing, sample pairing, and sensor temporal alignment.
+2. **Validation benchmark:** The selected `exp1_multimodal` model (MobileNetV2 + InceptionTime late fusion) achieved 81.15% validation accuracy and 0.8058 validation Macro F1 on 780 samples.
+3. **Independent modality evaluations:** Video-only MobileNetV2 and sensor-only InceptionTime models were evaluated alongside the multimodal model.
+4. **Held-out test comparison:** All three models were evaluated on the same 852 subject-independent test samples. Their prediction CSVs were verified to contain identical `sample_id` values in identical order.
+
+| Model | Test Accuracy | Macro F1 | Macro Precision | Macro Recall |
+|---|---:|---:|---:|---:|
+| Video-only MobileNetV2 | 42.49% | 0.4317 | 0.4665 | 0.4552 |
+| Sensor-only InceptionTime | 69.95% | 0.6665 | 0.7102 | 0.6987 |
+| **Multimodal MobileNetV2 + InceptionTime** | **76.76%** | **0.7545** | **0.7843** | **0.7652** |
+
+5. **Multimodal ranking:** The multimodal model achieved the strongest overall held-out test performance among these three evaluated configurations.
+6. **Reproducibility artifacts:** Evaluation JSON files, prediction CSVs, per-class metrics, and comparison plots were generated and preserved in the repository output structure.
+
+The results are specific to this dataset, split, and experimental setup. They do not establish performance on unseen datasets or deployment conditions.
 
 ---
 
@@ -115,15 +118,22 @@ Sensor processing follows the official MMAct challenge methodology ([`challenge-
 
 ## 5. Split Protocol & Leakage Prevention
 
-### Official MMAct Release vs. Project Partitioning:
-- **Official MMAct Protocol:** Provides official `train` and `val` files (`trimmed_x-scene_train.txt`, `trimmed_x-scene_val.txt`, `trimmed_x-view_train.txt`, `trimmed_x-view_val.txt`). The official MMAct benchmark **does not provide a labelled test split** in its public release (test evaluation was conducted blindly on challenge servers).
-- **Project Subject-Independent Partitioning:** To perform an honest final evaluation without blind server submission, this project uses a deterministic, subject-independent split that partitions recordings strictly by atomic recording groups `(subject, scene, session)`.
+### Official MMAct Release vs. Project Partitioning
 
-### Partition Statistics:
-- **Training Set:** 3,795 samples across 595 recordings.
-- **Validation Set:** 780 samples across 124 recordings (used for model tuning, hyperparameter exploration, and model selection).
-- **Held-Out Test Set:** 852 samples across 132 recordings (evaluated **once** on the final selected model).
-- **Leakage Isolation:** Zero overlap in subjects or session recordings between train, validation, and test partitions.
+- **Official MMAct protocol:** The public release provides official train and validation split files. It does not provide a locally labelled official test partition.
+- **Project subject-independent partition:** The experiments use a deterministic, subject-independent partition. Model training uses the training partition; model selection uses validation; the held-out test partition is kept separate from training and tuning.
+
+### Partition Statistics
+
+| Partition | Samples | Recordings | Use |
+|---|---:|---:|---|
+| Training | 3,795 | 595 | Model fitting |
+| Validation | 780 | 124 | Model selection |
+| Held-out test | 852 | 132 | Final evaluation |
+
+The final test predictions from the video-only, sensor-only, and multimodal models were checked against actual MMAct `sample_id` values. All three files contained the same 852 unique IDs in identical order.
+
+The split-isolation audit recorded no overlap of subjects, videos, recordings, or sessions between train, validation, and test partitions for the selected subject split.
 
 ---
 
@@ -212,68 +222,87 @@ All 9 model configurations were evaluated on the identical validation split ($N=
 
 ## 8. Final Held-Out Test Evaluation Results
 
-The top-ranked validation model (**`exp1_multimodal`**) was loaded from its best validation checkpoint ([`outputs/exp1_multimodal/checkpoints/best_model.pth`](file:///d:/HAR_MMAct/outputs/exp1_multimodal/checkpoints/best_model.pth)) and evaluated **once** on the completely independent held-out test split ($N=852$ samples, 132 recordings).
+Three model configurations were evaluated on the same 852-sample subject-independent held-out test partition. The test set was not used for training, hyperparameter tuning, or model selection.
 
-### 8.1 Summary Test Metrics
-- **Test Accuracy:** **77.23%** ($658 / 852$ correct)
-- **Macro F1 Score:** **0.7602**
-- **Macro Precision:** **0.7888**
-- **Macro Recall:** **0.7695**
-- **Multiclass ROC-AUC (One-vs-Rest):** **0.9673**
-- **Macro Average Precision (PR-AUC):** **0.8611**
+### 8.1 Overall Test Metrics
 
-### 8.2 Per-Class Performance Breakdown
+| Metric | Video-only MobileNetV2 | Sensor-only InceptionTime | Multimodal Fusion |
+|---|---:|---:|---:|
+| Accuracy | 42.49% | 69.95% | **76.76%** |
+| Macro F1 | 0.4317 | 0.6665 | **0.7545** |
+| Macro Precision | 0.4665 | 0.7102 | **0.7843** |
+| Macro Recall | 0.4552 | 0.6987 | **0.7652** |
+| ROC-AUC (OvR) | 0.8443 | 0.9373 | **0.9661** |
+| Macro Average Precision | 0.4732 | 0.7959 | **0.8590** |
 
-| Class Index | Activity Class | Support ($N$) | Precision | Recall | F1-Score | Detection Quality |
-|:---:|---|:---:|:---:|:---:|:---:|---|
-| `0` | `crouching` | 84 | 0.6754 | 0.9167 | 0.7778 | High recall; minor confusion with standing |
-| `1` | `jumping` | 84 | 0.3548 | 0.2619 | 0.3014 | Difficult; rapid transition confused with standing |
-| `2` | `kicking` | 84 | 0.6438 | 0.5595 | 0.5987 | Moderate; leg extension captured by phone acc |
-| `3` | `pointing` | 84 | 1.0000 | 0.6786 | 0.8085 | Perfect precision; subtle arm holds |
-| `4` | `running` | 84 | 1.0000 | 0.4881 | 0.6560 | Perfect precision; high-intensity locomotion |
-| `5` | `sitting` | 48 | 0.9796 | 1.0000 | **0.9897** | Flawless detection; thigh gravity vector |
-| `6` | `standing` | 84 | 0.6357 | 0.9762 | 0.7699 | High recall; absorbs transitory standing phases |
-| `7` | `using_phone` | 132 | 0.8733 | 0.9924 | **0.9291** | Excellent; wrist orientation signals |
-| `8` | `walking` | 84 | 0.8118 | 0.8214 | 0.8166 | Robust; cyclic gait acceleration |
-| `9` | `waving_hand` | 84 | 0.9130 | 1.0000 | **0.9545** | Near perfect; distinct gyro oscillations |
-| **Total / Macro** | **10 Classes** | **852** | **0.7888** | **0.7695** | **0.7602** | **Overall High Reliability** |
+### 8.2 Multimodal Per-Class Test Performance
 
-### 8.3 Test Confusion Matrix
+| Activity Class | Support | Precision | Recall | F1-Score |
+|---|---:|---:|---:|---:|
+| `crouching` | 84 | 0.6754 | 0.9167 | 0.7778 |
+| `jumping` | 84 | 0.3492 | 0.2619 | 0.2993 |
+| `kicking` | 84 | 0.6351 | 0.5595 | 0.5949 |
+| `pointing` | 84 | 1.0000 | 0.6786 | 0.8085 |
+| `running` | 84 | 1.0000 | 0.4524 | 0.6230 |
+| `sitting` | 48 | 0.9600 | 1.0000 | 0.9796 |
+| `standing` | 84 | 0.6357 | 0.9762 | 0.7700 |
+| `using_phone` | 132 | 0.8725 | 0.9848 | 0.9253 |
+| `walking` | 84 | 0.8023 | 0.8214 | 0.8118 |
+| `waving_hand` | 84 | 0.9130 | 1.0000 | 0.9545 |
 
-```
-True \ Pred      crouch  jump  kick  point  run  sit  stand  phone  walk  wave
-crouching          77     1     0      0     0    0     4      2     0     0
-jumping            34    22    11      0     0    0    14      0     3     0
-kicking             3     3    47      0     0    0    27      0     4     0
-pointing            0     0     0     57     0    0     2     17     0     8
-running             0    26     8      0    41    0     0      0     9     0
-sitting             0     0     0      0     0   48     0      0     0     0
-standing            0     0     2      0     0    0    82      0     0     0
-using_phone         0     0     0      0     0    1     0    131     0     0
-walking             0    10     5      0     0    0     0      0    69     0
-waving_hand         0     0     0      0     0    0     0      0     0    84
-```
+### 8.3 Interpretation
+
+- Sensor-only InceptionTime substantially outperformed video-only MobileNetV2 on this test partition.
+- Multimodal fusion improved test accuracy by 6.81 percentage points over sensor-only and by 34.27 percentage points over video-only.
+- The multimodal model achieved the highest Macro F1, ROC-AUC, and macro average precision of the three evaluated configurations.
+- `jumping` remains the weakest multimodal class by F1 (0.2993). `running` has 0.4524 recall, indicating that many actual running samples were missed.
+- Strong aggregate metrics should not obscure these class-specific weaknesses.
+
+### 8.4 Test Artifact Locations
+
+- Consolidated metrics: `outputs/model_comparison/test_metrics_comparison.csv`
+- Per-class comparison: `outputs/model_comparison/per_class_test_metrics.csv`
+- Accuracy graph: `outputs/model_comparison/test_accuracy_comparison.png`
+- Macro F1 graph: `outputs/model_comparison/test_macro_f1_comparison.png`
+- Per-class F1 graph: `outputs/model_comparison/per_class_test_f1_comparison.png`
+- Multimodal evaluation: `outputs/exp1_multimodal/test_evaluation_v2.json`
+- Sensor-only evaluation: `outputs/sensor_only_inception_time_v2/test_evaluation.json`
+- Video-only evaluation: `outputs/mobilenet_v2_staged_v2_retrained/test_evaluation_v2.json`
 
 ---
 
 ## 9. Artifact Index
 
-All evaluation artifacts are preserved in the repository under [`outputs/`](file:///d:/HAR_MMAct/outputs/):
+### Consolidated Model Comparison
 
-| Category | Artifact Path | Description |
+| Artifact | Path | Purpose |
 |---|---|---|
-| **Final Test Metrics** | [`outputs/final_test/exp1_multimodal_test.json`](file:///d:/HAR_MMAct/outputs/final_test/exp1_multimodal_test.json) | Complete machine-readable test evaluation results |
-| **Final Test Summary** | [`outputs/final_test/metrics.csv`](file:///d:/HAR_MMAct/outputs/final_test/metrics.csv) | Summary test performance row |
-| **Test Predictions** | [`outputs/final_test/test_predictions.csv`](file:///d:/HAR_MMAct/outputs/final_test/test_predictions.csv) | Per-sample predictions, confidences, and probabilities |
-| **Benchmark Manifest** | [`outputs/benchmark_validation/execution_manifest.json`](file:///d:/HAR_MMAct/outputs/benchmark_validation/execution_manifest.json) | Complete execution metadata across benchmark validation models (9 total evaluated configurations) |
-| **Selected Checkpoint** | [`outputs/exp1_multimodal/checkpoints/best_model.pth`](file:///d:/HAR_MMAct/outputs/exp1_multimodal/checkpoints/best_model.pth) | Best validation checkpoint weights (32.9 MB) |
-| **Validation Confusion Matrix** | `outputs/benchmark_validation/exp1_multimodal/plots/val_confusion_matrix.png` | Validation confusion matrix plot |
-| **Validation ROC Curves** | `outputs/benchmark_validation/exp1_multimodal/plots/val_roc_ovr.png` | One-vs-Rest ROC curves with macro/micro AUC |
-| **Validation PR Curves** | `outputs/benchmark_validation/exp1_multimodal/plots/val_pr_curves.png` | Precision-Recall curves with per-class AP |
-| **Training History** | `outputs/exp1_multimodal/history.json` | 50-epoch loss and accuracy training trajectory |
+| Overall metrics CSV | `outputs/model_comparison/test_metrics_comparison.csv` | Test metrics for all three models |
+| Overall metrics JSON | `outputs/model_comparison/test_metrics_comparison.json` | Machine-readable comparison |
+| Per-class metrics CSV | `outputs/model_comparison/per_class_test_metrics.csv` | Per-class precision, recall, and F1 for each model |
+| Accuracy graph | `outputs/model_comparison/test_accuracy_comparison.png` | Overall test accuracy comparison |
+| Macro F1 graph | `outputs/model_comparison/test_macro_f1_comparison.png` | Overall test Macro F1 comparison |
+| Per-class F1 graph | `outputs/model_comparison/per_class_test_f1_comparison.png` | Class-level F1 comparison |
 
-> [!IMPORTANT]
-> **Checkpoint Availability and Git Exclusion:** The selected checkpoint binary (`outputs/exp1_multimodal/checkpoints/best_model.pth`, 32.9 MB) is available locally in this workspace from the completed Kaggle training run. However, all checkpoint files (`*.pth`, `*.pt`) are explicitly excluded from Git version control via `.gitignore`. A fresh clone of the GitHub repository will not include these binary weights. To obtain or reproduce checkpoints, users must run training locally or on Kaggle GPU, or retrieve their exported training artifacts. No external or fabricated download links are provided.
+### Per-Model Evaluation Files
+
+| Model | Evaluation JSON | Prediction CSV | Plot Directory |
+|---|---|---|---|
+| Video-only MobileNetV2 | `outputs/mobilenet_v2_staged_v2_retrained/test_evaluation_v2.json` | `outputs/mobilenet_v2_staged_v2_retrained/test_predictions.csv` | `outputs/mobilenet_v2_staged_v2_retrained/test_plots_v2/` |
+| Sensor-only InceptionTime | `outputs/sensor_only_inception_time_v2/test_evaluation.json` | `outputs/sensor_only_inception_time_v2/test_predictions.csv` | `outputs/sensor_only_inception_time_v2/test_plots/` |
+| Multimodal fusion | `outputs/exp1_multimodal/test_evaluation_v2.json` | `outputs/exp1_multimodal/test_predictions.csv` | `outputs/exp1_multimodal/test_plots_v2/` |
+
+Each prediction CSV includes the actual MMAct `sample_id`, ground-truth label, predicted label, confidence, and class probabilities.
+
+### Training and Validation Artifacts
+
+- Validation benchmark: `outputs/benchmark_validation/`
+- Multimodal training history: `outputs/exp1_multimodal/history.json`
+- Sensor-only training summary: `outputs/sensor_only_inception_time_v2/training_summary.json`
+- Sensor-only runtime report: `outputs/sensor_only_inception_time_v2/runtime_report.json`
+
+> [!NOTE]
+> Preprocessing caches and temporary data are excluded from the artifact handover. Model checkpoint binaries remain subject to `.gitignore` rules and must be supplied separately or recreated through training if they are not present in a clone.
 
 ---
 
@@ -357,12 +386,19 @@ python -m pytest tests/test_models.py tests/test_splits.py -v
 
 ## 11. Known Limitations & Recommendations
 
-1. **Stationary vs. Dynamic Vertical Ambiguity:** `jumping` exhibited lower recall (0.2619) because vertical deceleration phases resemble `standing` and `crouching` on 1.0-second sensor windows. Expanding the window size from 1.0 s to 2.0 s in future research would capture complete jump trajectories.
-2. **Video Feature Disconnect:** Single-camera perspectives suffer from occlusion when subjects face away from the lens. Wearable sensors provide essential invariance to viewing angles.
-3. **Official Blind Benchmark Set:** The unlabelled challenge set (`test_set_cross-view_1`) remains unannotated by the challenge organizers and cannot be used for local supervised evaluation. All reported metrics represent our leakage-free held-out partition.
+1. **Jumping recognition:** The multimodal test F1 for `jumping` is 0.2993, with 0.2619 recall. Rapid motion and transition phases remain difficult to distinguish.
+2. **Running recall:** The multimodal model has 1.0000 precision but 0.4524 recall for `running`; it misses many true running samples.
+3. **Class-dependent performance:** The three models show different strengths across activities. Accuracy alone is insufficient; Macro F1 and per-class metrics should also be considered.
+4. **Video-only baseline:** Video-only MobileNetV2 achieved 42.49% test accuracy, substantially below sensor-only and multimodal results in this experiment.
+5. **Dataset and split scope:** Results come from a custom subject-independent partition of MMAct. External datasets, new recording environments, and deployment conditions have not been evaluated here.
+6. **Official blind test data:** The unlabelled official challenge test set cannot be used for local supervised evaluation. Reported test metrics refer only to the project's labelled held-out partition.
 
 ---
 
 ## 12. Conclusion
 
-The HAR-MMAct project successfully demonstrates that fusing wearable inertial sensor streams with video representations delivers superior activity recognition performance compared to unimodal baselines. The top-ranked model achieves **81.15% validation accuracy** and **77.23% held-out test accuracy** across 10 physical actions. All code, checkpoints, and evaluation artifacts are strictly verified, reproducible, and documented.
+The HAR-MMAct project implements a software-only human activity recognition pipeline using genuine MMAct video and wearable inertial sensor data for 10 activity classes.
+
+On the same 852 subject-independent held-out test samples, the multimodal MobileNetV2 + InceptionTime model achieved **76.76% accuracy** and **0.7545 Macro F1**, compared with 69.95% accuracy and 0.6665 Macro F1 for sensor-only InceptionTime, and 42.49% accuracy and 0.4317 Macro F1 for video-only MobileNetV2.
+
+These results support multimodal fusion for this experimental setup. However, weak recognition of jumping and reduced running recall remain limitations. The evaluation artifacts and sample-level predictions are preserved to make the reported comparison auditable.

@@ -1,0 +1,35 @@
+{
+  "Video-only MobileNetV2": {
+    "evaluation_file": "outputs/mobilenet_v2_staged_v2_retrained/test_evaluation_v2.json",
+    "test_samples": 852,
+    "split_strategy": "subject",
+    "accuracy": 0.42488262910798125,
+    "macro_f1": 0.4316926492962163,
+    "macro_precision": 0.46654958771480814,
+    "macro_recall": 0.45516774891774886,
+    "roc_auc_ovr": 0.8442960538891043,
+    "average_precision_macro": 0.4731530320544345
+  },
+  "Sensor-only InceptionTime": {
+    "evaluation_file": "outputs/sensor_only_inception_time_v2/test_evaluation.json",
+    "test_samples": 852,
+    "split_strategy": "subject",
+    "accuracy": 0.6995305164319249,
+    "macro_f1": 0.6664885703234619,
+    "macro_precision": 0.710160200037081,
+    "macro_recall": 0.6987012987012987,
+    "roc_auc_ovr": 0.9373085016835017,
+    "average_precision_macro": 0.795943603758917
+  },
+  "Multimodal MobileNetV2 + InceptionTime": {
+    "evaluation_file": "outputs/exp1_multimodal/test_evaluation_v2.json",
+    "test_samples": 852,
+    "split_strategy": "subject",
+    "accuracy": 0.7676056338028169,
+    "macro_f1": 0.7544617625219981,
+    "macro_precision": 0.7843291276694122,
+    "macro_recall": 0.7651515151515151,
+    "roc_auc_ovr": 0.9661350390061327,
+    "average_precision_macro": 0.8589989089438038
+  }
+}

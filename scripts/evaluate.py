@@ -274,7 +274,7 @@ def main():
 
     # DataLoader
     c_eval = (Path(args.cache_dir) / eval_split_name) if args.cache_dir else None
-    eval_ds = MMActMultimodalDataset(eval_samples, cache_dir=c_eval, enable_cache=(c_eval is not None))
+    eval_ds = MMActMultimodalDataset(eval_samples, cache_dir=c_eval, enable_cache=(c_eval is not None), mode=saved_cfg.get("mode", "multimodal"))
     eval_loader = DataLoader(eval_ds, batch_size=args.batch_size, shuffle=False, num_workers=0, pin_memory=(device.type == "cuda"))
 
     # Load primary model
@@ -452,13 +452,14 @@ def main():
         confidences = np.max(probs_out, axis=-1)
         with open(preds_path, "w", newline="") as f:
             writer = csv.writer(f)
-            header = ["sample_idx", "ground_truth", "predicted", "confidence"] + [f"prob_{c}" for c in classes]
+            header = ["sample_idx", "sample_id", "ground_truth", "predicted", "confidence"] + [f"prob_{c}" for c in classes]
             writer.writerow(header)
             for idx in range(len(y_true_out)):
                 gt_idx = int(y_true_out[idx])
                 pl_idx = int(pred_labels[idx])
                 row = [
                     idx,
+                    eval_samples[idx].sample_id,
                     classes[gt_idx] if gt_idx < len(classes) else str(gt_idx),
                     classes[pl_idx] if pl_idx < len(classes) else str(pl_idx),
                     round(float(confidences[idx]), 4),
