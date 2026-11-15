@@ -319,8 +319,8 @@ def main():
     # 3. Create Datasets & Loaders
     print("\n[Step 3] Initializing PyTorch Datasets and Caching...")
     cache_path = Path(args.cache_dir)
-    train_ds = MMActMultimodalDataset(train_samples, cache_dir=cache_path / "train", enable_cache=True)
-    val_ds = MMActMultimodalDataset(val_samples, cache_dir=cache_path / "val", enable_cache=True)
+    train_ds = MMActMultimodalDataset(train_samples, cache_dir=cache_path / "train", enable_cache=True, mode=args.mode)
+    val_ds = MMActMultimodalDataset(val_samples, cache_dir=cache_path / "val", enable_cache=True, mode=args.mode)
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     pin_mem = (device.type == "cuda") and args.pin_memory

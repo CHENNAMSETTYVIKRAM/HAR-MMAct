@@ -1,0 +1,10 @@
+{
+  "model": "custom_cnn",
+  "mode": "video_only",
+  "epochs_requested": 50,
+  "epochs_completed": 30,
+  "total_runtime_seconds": 3837.98,
+  "avg_epoch_duration_seconds": 127.93,
+  "peak_gpu_memory_mb": 274.9,
+  "best_val_f1": 0.0979
+}

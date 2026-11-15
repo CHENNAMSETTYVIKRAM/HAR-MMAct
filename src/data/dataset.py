@@ -40,7 +40,11 @@ class MMActMultimodalDataset(Dataset):
         sensor_loader: Optional[SensorLoader] = None,
         cache_dir: Optional[Union[str, Path]] = None,
         enable_cache: bool = True,
+        mode: str = "multimodal",
     ):
+        if mode not in {"multimodal", "video_only", "sensor_only"}:
+            raise ValueError(f"Unsupported dataset mode: {mode}")
+        self.mode = mode
         self.samples = samples
         self.video_loader = video_loader or VideoLoader()
         self.sensor_loader = sensor_loader or SensorLoader()
@@ -61,7 +65,7 @@ class MMActMultimodalDataset(Dataset):
         sr = getattr(sc, "primary_rate_hz", 100)
         mods = "-".join(sorted(getattr(sc, "modalities", [])))
         config_descriptor = (
-            f"{CACHE_SCHEMA_VERSION}|"
+            f"{CACHE_SCHEMA_VERSION}|mode={self.mode}|"
             f"vf={vc.num_frames}|vh={vh}|vw={vw}|vs={vc.sampling_strategy}|"
             f"sw={sc.window_size}|sr={sr}|sm={mods}"
         )
@@ -215,8 +219,23 @@ class MMActMultimodalDataset(Dataset):
         self.cache_misses += 1
 
         # 2. Recompute video and sensor tensors
-        video_tensor = self.video_loader.load_and_preprocess(sample.video_path)
-        sensor_tensor = self.sensor_loader.load_and_preprocess(sample.sensor_paths)
+        if self.mode == "video_only":
+            video_tensor = self.video_loader.load_and_preprocess(sample.video_path)
+            sensor_tensor = torch.zeros(
+                len(self.sensor_loader.config.modalities) * 3,
+                self.sensor_loader.config.window_size,
+                dtype=torch.float32,
+            )
+        elif self.mode == "sensor_only":
+            video_cfg = self.video_loader.config
+            video_tensor = torch.zeros(
+                3, video_cfg.num_frames, video_cfg.frame_height,
+                video_cfg.frame_width, dtype=torch.float32
+            )
+            sensor_tensor = self.sensor_loader.load_and_preprocess(sample.sensor_paths)
+        else:
+            video_tensor = self.video_loader.load_and_preprocess(sample.video_path)
+            sensor_tensor = self.sensor_loader.load_and_preprocess(sample.sensor_paths)
 
         # 3. Save to cache atomically if disk space permits
         if cache_path and self._has_sufficient_disk_space():
