@@ -59,6 +59,7 @@ class IndexerReport:
 
     # Diagnostic anomaly lists
     missing_sensors: List[Dict[str, str]] = field(default_factory=list)
+    empty_sensor_files: List[str] = field(default_factory=list)
     missing_videos: List[Dict[str, str]] = field(default_factory=list)
     unknown_label_files: List[str] = field(default_factory=list)
     duplicate_ids: List[str] = field(default_factory=list)
@@ -71,6 +72,7 @@ class IndexerReport:
             f"Total Sensor Files Found  : {self.total_sensor_files_found}",
             f"Paired Multimodal Samples : {self.paired_samples_count}",
             f"Missing Sensor Incidents  : {len(self.missing_sensors)}",
+            f"Empty Sensor Files        : {len(self.empty_sensor_files)}",
             f"Missing Video Incidents   : {len(self.missing_videos)}",
             f"Unknown Label Files Filtered: {len(self.unknown_label_files)}",
             f"Duplicate IDs Encountered : {len(self.duplicate_ids)}",
@@ -302,6 +304,12 @@ class MMActIndexer:
 
         for sen_file in sensor_files:
             report.total_sensor_files_found += 1
+
+            # Reject zero-byte sensor files; preserve original dataset files.
+            if sen_file.stat().st_size == 0:
+                report.empty_sensor_files.append(str(sen_file))
+                continue
+
             parsed = self.parse_sensor_path(sen_file)
             if not parsed:
                 continue
