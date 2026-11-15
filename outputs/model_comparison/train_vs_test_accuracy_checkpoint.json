@@ -1,0 +1,32 @@
+{
+  "method": "Training accuracy recorded during the selected best-validation checkpoint epoch compared with held-out test accuracy from the same checkpoint. Test data was not evaluated epoch by epoch.",
+  "results": [
+    {
+      "model": "Video-only MobileNetV2",
+      "checkpoint_epoch": 32,
+      "training_accuracy_at_checkpoint_epoch_percent": 55.9621,
+      "held_out_test_accuracy_percent": 42.4883,
+      "test_samples": 852,
+      "split": "subject-independent",
+      "individual_plot": "outputs/mobilenet_v2_staged_v2_retrained/plots/train_vs_test_accuracy_checkpoint.png"
+    },
+    {
+      "model": "Sensor-only InceptionTime",
+      "checkpoint_epoch": 15,
+      "training_accuracy_at_checkpoint_epoch_percent": 75.0198,
+      "held_out_test_accuracy_percent": 69.9531,
+      "test_samples": 852,
+      "split": "subject-independent",
+      "individual_plot": "outputs/sensor_only_inception_time_v2/plots/train_vs_test_accuracy_checkpoint.png"
+    },
+    {
+      "model": "Multimodal MobileNetV2 + InceptionTime",
+      "checkpoint_epoch": 49,
+      "training_accuracy_at_checkpoint_epoch_percent": 98.2082,
+      "held_out_test_accuracy_percent": 76.7606,
+      "test_samples": 852,
+      "split": "subject-independent",
+      "individual_plot": "outputs/exp1_multimodal/plots/train_vs_test_accuracy_checkpoint.png"
+    }
+  ]
+}

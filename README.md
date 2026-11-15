@@ -355,3 +355,17 @@ For execution on Kaggle GPU:
    - `vikramche/mmact-trimmed`
 3. Enable GPU accelerator (`Tesla T4 x2` or `P100`) and set Internet to `On`.
 4. Run all cells top-to-bottom. The automated staging discovers attached inputs, verifies integrity, caches preprocessed tensors, trains all benchmark models, and exports `har_mmact_results.zip`.
+
+### Individual Training vs Held-Out Test Accuracy
+
+These checkpoint-level plots compare the training accuracy recorded
+during each selected checkpoint epoch with the corresponding held-out
+test accuracy. Test data is evaluated after model selection, not once
+per epoch.
+
+- Video-only: `outputs/mobilenet_v2_staged_v2_retrained/plots/train_vs_test_accuracy_checkpoint.png`
+- Sensor-only: `outputs/sensor_only_inception_time_v2/plots/train_vs_test_accuracy_checkpoint.png`
+- Multimodal: `outputs/exp1_multimodal/plots/train_vs_test_accuracy_checkpoint.png`
+- Combined comparison: `outputs/model_comparison/train_vs_test_accuracy_final_models.png`
+- Source script: `scripts/plot_train_vs_test_accuracy.py`
+- Data table: `outputs/model_comparison/train_vs_test_accuracy_checkpoint.csv`

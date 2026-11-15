@@ -1,0 +1,4 @@
+model,checkpoint_epoch,training_accuracy_at_checkpoint_epoch_percent,held_out_test_accuracy_percent,test_samples,split,individual_plot
+Video-only MobileNetV2,32,55.9621,42.4883,852,subject-independent,outputs/mobilenet_v2_staged_v2_retrained/plots/train_vs_test_accuracy_checkpoint.png
+Sensor-only InceptionTime,15,75.0198,69.9531,852,subject-independent,outputs/sensor_only_inception_time_v2/plots/train_vs_test_accuracy_checkpoint.png
+Multimodal MobileNetV2 + InceptionTime,49,98.2082,76.7606,852,subject-independent,outputs/exp1_multimodal/plots/train_vs_test_accuracy_checkpoint.png
