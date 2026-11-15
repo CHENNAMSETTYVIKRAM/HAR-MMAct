@@ -1,0 +1,10 @@
+model_name,mode,checkpoint_available,checkpoint_epoch,train_acc_reported,train_acc_source,test_acc,test_f1
+exp1_multimodal,multimodal,YES,49,98.21,Best Checkpoint (Epoch 49),77.23,0.7602
+multimodal_fusion,multimodal,YES,30,96.79,Best Checkpoint (Epoch 30),75.59,0.7482
+tcn_gated_fusion,multimodal,YES,31,99.1,Final Recorded Epoch (Epoch 50),N/A,N/A
+tcn_sensor_only,sensor_only,YES,42,97.15,Final Recorded Epoch (Epoch 50),N/A,N/A
+exp2_sensor_only,sensor_only,YES,47,90.36,Best Checkpoint (Epoch 47),68.54,0.6578
+mobilenet_v2_staged_v2,video_only,NO,N/A,94.41,Final Recorded Epoch (Epoch 50),N/A,N/A
+mobilenet_v2,video_only,YES,41,49.99,Best Checkpoint (Epoch 41),42.14,0.4153
+improved_cnn_v2,video_only,NO,N/A,17.89,Final Recorded Epoch (Epoch 50),N/A,N/A
+improved_cnn,video_only,YES,47,15.97,Best Checkpoint (Epoch 47),15.38,0.1139

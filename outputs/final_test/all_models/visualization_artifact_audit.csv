@@ -1,0 +1,10 @@
+Model,Training History,Accuracy Plot,Loss Plot,Confusion Matrix,Precision Plot,Recall Plot,F1 Plot,ROC Plot,PR Plot,Validation Prediction/Metric Artifacts
+exp1_multimodal,True,True,True,True,True,True,True,True,True,True
+multimodal_fusion,True,True,True,True,True,True,True,True,True,True
+tcn_gated_fusion,True,True,True,True,True,True,True,True,True,True
+tcn_sensor_only,True,True,True,True,True,True,True,True,True,True
+exp2_sensor_only,True,True,True,True,True,True,True,True,True,True
+mobilenet_v2_staged_v2,True,True,True,True,True,True,True,True,True,True
+mobilenet_v2,True,True,True,True,True,True,True,True,True,True
+improved_cnn_v2,True,True,True,True,True,True,True,True,True,True
+improved_cnn,True,True,True,True,True,True,True,True,True,True

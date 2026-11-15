@@ -1,0 +1,5 @@
+Trial,Validation Accuracy,Macro F1
+Trial 1: Baseline,15.9,0.0274
+Trial 2: Higher LR,15.51,0.0815
+Trial 3: Heavy Regularization,10.51,0.0504
+Trial 4: Low LR,13.97,0.0737

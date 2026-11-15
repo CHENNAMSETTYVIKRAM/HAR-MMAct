@@ -41,3 +41,30 @@ Thumbs.db
 # Local reference material and generated runtime manifests
 reference_nb/
 outputs/manifests/
+
+
+# Dataset files
+data/
+*.zip
+*.rar
+*.7z
+
+# Model checkpoints and weights
+*.pth
+*.pt
+*.ckpt
+*.onnx
+
+# Python generated files
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Notebook checkpoints
+.ipynb_checkpoints/
+
+# Temporary files
+*.tmp
+*.log
+.DS_Store

@@ -95,7 +95,6 @@ def main():
         video_backbone=saved_cfg.get("video_backbone", "resnet18"),
         sensor_backbone=saved_cfg.get("sensor_backbone", "inception_time"),
         pretrained_video=False,
-        fusion_strategy=saved_cfg.get("fusion_strategy", "concat"),
     )
 
     # Reconstruct the exact MobileNetV2 architecture used during training.

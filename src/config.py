@@ -96,10 +96,7 @@ class SensorConfig:
     convert_acc_to_g: bool = (
         True  # MMAct accelerometer divide by 9.8 (m/s^2 -> g)
     )
-    fill_strategy: str = "bfill"  # backward fill gap alignment ('bfill' or 'bfill_ffill_bounded')
-    max_ffill_limit: Optional[int] = (
-        None  # None -> auto-calculated (e.g. 2 for 50 Hz -> 100 Hz)
-    )
+    fill_strategy: str = "bfill"  # backward fill gap alignment
 
 
 @dataclass

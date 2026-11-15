@@ -1,0 +1,3 @@
+Model,Total Epochs,Best Epoch,Best Train Accuracy (%),Best Validation Accuracy (%),Validation Loss,Final Train Accuracy (%),Final Validation Accuracy (%),Test Accuracy (%)
+MobileNetV2 Staged V2,50,38,93.59683794466403,49.358974358974365,1.9645370221672913,94.4137022397892,46.02564102564102,
+Improved CNN V2,50,26,16.231884057971012,16.794871794871792,1.9943853940719214,17.891963109354414,15.897435897435896,
