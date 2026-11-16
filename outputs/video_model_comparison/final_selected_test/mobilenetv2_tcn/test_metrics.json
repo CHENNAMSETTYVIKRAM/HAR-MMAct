@@ -1,0 +1,12 @@
+{
+  "model": "MobileNetV2 + TCN",
+  "checkpoint_epoch": 9,
+  "test_samples": 852,
+  "test_loss": 2.1416195793330948,
+  "accuracy": 0.33568075117370894,
+  "macro_precision": 0.32769084074029264,
+  "macro_recall": 0.3716179653679654,
+  "macro_f1": 0.32771432655738636,
+  "roc_auc_ovr_macro": 0.8053045669414024,
+  "macro_average_precision": 0.3699222749161116
+}

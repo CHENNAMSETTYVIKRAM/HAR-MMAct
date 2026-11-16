@@ -1,0 +1,122 @@
+[
+  {
+    "test_rank_by_macro_f1": 1,
+    "model": "Primary Multimodal MobileNetV2 + InceptionTime",
+    "modality": "Multimodal",
+    "accuracy": 0.767606,
+    "precision": 0.7843291,
+    "recall": 0.7651515,
+    "macro_f1": 0.7544618,
+    "roc_auc_ovr": 0.966135,
+    "macro_ap": 0.8589989,
+    "test_samples": 852
+  },
+  {
+    "test_rank_by_macro_f1": 2,
+    "model": "Additional Multimodal Fusion",
+    "modality": "Multimodal",
+    "accuracy": 0.754695,
+    "precision": 0.7770245,
+    "recall": 0.7537879,
+    "macro_f1": 0.7464,
+    "roc_auc_ovr": 0.9662302,
+    "macro_ap": 0.8499825,
+    "test_samples": 852
+  },
+  {
+    "test_rank_by_macro_f1": 3,
+    "model": "Gated Multimodal TCN",
+    "modality": "Multimodal",
+    "accuracy": 0.739437,
+    "precision": 0.7698761,
+    "recall": 0.7391775,
+    "macro_f1": 0.7241405,
+    "roc_auc_ovr": 0.9582143,
+    "macro_ap": 0.8267652,
+    "test_samples": 852
+  },
+  {
+    "test_rank_by_macro_f1": 4,
+    "model": "Sensor-only TCN",
+    "modality": "Sensor-only",
+    "accuracy": 0.746479,
+    "precision": 0.8133463,
+    "recall": 0.7428571,
+    "macro_f1": 0.7190475,
+    "roc_auc_ovr": 0.952381,
+    "macro_ap": 0.8093668,
+    "test_samples": 852
+  },
+  {
+    "test_rank_by_macro_f1": 5,
+    "model": "Sensor-only InceptionTime",
+    "modality": "Sensor-only",
+    "accuracy": 0.685446,
+    "precision": 0.7069566,
+    "recall": 0.6809524,
+    "macro_f1": 0.656283,
+    "roc_auc_ovr": 0.9311055,
+    "macro_ap": 0.774191,
+    "test_samples": 852
+  },
+  {
+    "test_rank_by_macro_f1": 6,
+    "model": "Retrained MobileNetV2",
+    "modality": "Video-only",
+    "accuracy": 0.424883,
+    "precision": 0.4665496,
+    "recall": 0.4551677,
+    "macro_f1": 0.4316926,
+    "roc_auc_ovr": 0.8442961,
+    "macro_ap": 0.473153,
+    "test_samples": 852
+  },
+  {
+    "test_rank_by_macro_f1": 7,
+    "model": "Original MobileNetV2",
+    "modality": "Video-only",
+    "accuracy": 0.421362,
+    "precision": 0.4473264,
+    "recall": 0.4589827,
+    "macro_f1": 0.4153285,
+    "roc_auc_ovr": 0.8608784,
+    "macro_ap": 0.4982421,
+    "test_samples": 852
+  },
+  {
+    "test_rank_by_macro_f1": 8,
+    "model": "MobileNetV2 + TCN",
+    "modality": "Video-only temporal",
+    "accuracy": 0.33568075117370894,
+    "precision": 0.32769084074029264,
+    "recall": 0.3716179653679654,
+    "macro_f1": 0.32771432655738636,
+    "roc_auc_ovr": 0.8053045669414024,
+    "macro_ap": 0.3699222749161116,
+    "test_samples": 852
+  },
+  {
+    "test_rank_by_macro_f1": 9,
+    "model": "Original Custom CNN",
+    "modality": "Video-only",
+    "accuracy": 0.153756,
+    "precision": 0.1540507,
+    "recall": 0.1726732,
+    "macro_f1": 0.113918,
+    "roc_auc_ovr": 0.6160074,
+    "macro_ap": 0.1791272,
+    "test_samples": 852
+  },
+  {
+    "test_rank_by_macro_f1": 10,
+    "model": "Retrained Custom CNN V2",
+    "modality": "Video-only",
+    "accuracy": 0.132629,
+    "precision": 0.130708,
+    "recall": 0.1449134,
+    "macro_f1": 0.0939734,
+    "roc_auc_ovr": 0.6090665,
+    "macro_ap": 0.1785642,
+    "test_samples": 852
+  }
+]

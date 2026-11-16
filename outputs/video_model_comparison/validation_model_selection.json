@@ -1,0 +1,10 @@
+{
+  "selection_metric": "Validation Macro F1",
+  "selected_model": "MobileNetV2 + TCN",
+  "candidate_scores": {
+    "MobileNetV2 Fine-tuning V2": 0.2932357895098398,
+    "MobileNetV2 + BiLSTM": 0.32158435368072963,
+    "MobileNetV2 + TCN": 0.34322513923450615
+  },
+  "test_evaluation_performed": false
+}

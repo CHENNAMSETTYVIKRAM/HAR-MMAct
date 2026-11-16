@@ -1,0 +1,5 @@
+model,validation_accuracy,validation_macro_f1
+MobileNetV2 Original,0.3526,0.3492
+MobileNetV2 + TCN,0.3474359,0.3432251
+MobileNetV2 + BiLSTM,0.3141026,0.3215844
+MobileNetV2 Fine-tuning V2,0.3012821,0.2932358

@@ -1,0 +1,20 @@
+HAR-MMAct — Ten-Model Test Benchmark
+
+Dataset split:
+- Subject-independent custom split
+- Test samples: 852
+- Test subjects: 18, 19, 20
+- Ten target activity classes
+
+Selection:
+- Model selection was performed using validation results.
+- The new MobileNetV2 + TCN checkpoint was selected from
+  the new temporal experiments using validation Macro F1.
+- The test set was evaluated after selection.
+
+Important interpretation:
+- The existing primary multimodal model remains the project champion.
+- MobileNetV2 + TCN is an additional video-only temporal experiment.
+- Do not describe it as an improvement over the existing benchmark.
+- Historical benchmark metrics are retained from the previously
+  completed nine-model evaluation.

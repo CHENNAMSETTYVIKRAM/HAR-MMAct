@@ -356,3 +356,31 @@ For execution on Kaggle GPU:
 - **Collaboration & Contributions:** Access to this repository does not transfer or imply transfer of original intellectual property. Collaborators and contributors are subject to [`COLLABORATION_POLICY.md`](COLLABORATION_POLICY.md), [`CONTRIBUTING.md`](CONTRIBUTING.md), and signed written agreements.
 - **Third-Party Rights & Challenge-Main Disclaimer:** The folder `challenge-main/` contains the unmodified starter toolkit, evaluation scripts, and challenge materials from the **MMAct Challenge 2021** (Quan Kong, Norimichi Ukita, et al.; licensed under CC BY-NC 4.0). CHENNAMSETTY VIKRAM did not author or develop `challenge-main/`; it was added strictly as an external reference and benchmark evaluation toolkit. The Creator asserts copyright solely over original source code (`src/`), execution pipelines (`scripts/`), test suites (`tests/`), notebooks (`notebooks/`), and original documentation.
 - **Legal References:** See full legal documentation in [`LICENSE`](LICENSE), [`COPYRIGHT.md`](COPYRIGHT.md), and [`IP_OWNERSHIP.md`](IP_OWNERSHIP.md).
+
+
+---
+
+## Additional Video-Only Experiments (November 2026)
+
+Additional video-only experiments were completed on 16 November 2026.
+These included MobileNetV2 Fine-tuning V2, MobileNetV2 + BiLSTM,
+and MobileNetV2 + TCN.
+
+| Model | Validation Accuracy | Validation Macro F1 |
+|---|---:|---:|
+| Original MobileNetV2 | 35.26% | 0.3492 |
+| MobileNetV2 Fine-tuning V2 | 30.13% | 0.2932 |
+| MobileNetV2 + BiLSTM | 31.41% | 0.3216 |
+| MobileNetV2 + TCN | 34.74% | 0.3432 |
+
+The MobileNetV2 + TCN experiment achieved 33.57% test accuracy,
+0.3277 test Macro F1, 0.8053 macro ROC-AUC (OvR), and 0.3699
+macro average precision on 852 held-out test samples.
+
+The TCN did not outperform the original video-only baseline
+or the primary multimodal model. It is documented as an additional
+temporal experiment rather than a project performance improvement.
+
+See [`docs/ADDITIONAL_VIDEO_EXPERIMENTS.md`](docs/ADDITIONAL_VIDEO_EXPERIMENTS.md)
+and [`docs/FINAL_HAR_PROJECT_REPORT.md`](docs/FINAL_HAR_PROJECT_REPORT.md)
+for detailed methodology, results and limitations.

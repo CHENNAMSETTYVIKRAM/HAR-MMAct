@@ -1,0 +1,16 @@
+[
+  {
+    "model": "BILSTM",
+    "checkpoint_epoch": 11,
+    "validation_samples": 780,
+    "validation_macro_roc_auc_ovr": 0.787001028864877,
+    "validation_macro_average_precision": 0.3313949239163391
+  },
+  {
+    "model": "TCN",
+    "checkpoint_epoch": 9,
+    "validation_samples": 780,
+    "validation_macro_roc_auc_ovr": 0.8012021682201483,
+    "validation_macro_average_precision": 0.3507642276519906
+  }
+]

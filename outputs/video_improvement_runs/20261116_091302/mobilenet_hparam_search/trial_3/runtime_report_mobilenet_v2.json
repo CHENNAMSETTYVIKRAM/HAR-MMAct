@@ -1,0 +1,10 @@
+{
+  "model": "mobilenet_v2",
+  "mode": "video_only",
+  "epochs_requested": 3,
+  "epochs_completed": 3,
+  "total_runtime_seconds": 123.6,
+  "avg_epoch_duration_seconds": 41.2,
+  "peak_gpu_memory_mb": 1322.2,
+  "best_val_f1": 0.2107
+}
