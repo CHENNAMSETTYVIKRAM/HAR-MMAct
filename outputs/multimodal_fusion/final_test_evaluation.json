@@ -1,0 +1,391 @@
+{
+  "checkpoint": "/kaggle/working/HAR-MMAct/outputs/multimodal_fusion/checkpoints/best_model_multimodal.pth",
+  "dataset_root": "data/genuine_mmact",
+  "is_synthetic": false,
+  "split_strategy": "subject",
+  "is_official_split": false,
+  "is_custom_test": true,
+  "is_official_validation": false,
+  "train_source_file": null,
+  "val_source_file": null,
+  "eval_split": "test",
+  "eval_split_description": "Held-Out Test Split",
+  "eval_samples_count": 852,
+  "rejected_missing_required_sensor_samples": 0,
+  "requested_eval_split": "test",
+  "train_samples_count": 3795,
+  "val_samples_count": 780,
+  "test_samples_count": 852,
+  "train_recordings_count": 595,
+  "val_recordings_count": 124,
+  "test_recordings_count": 132,
+  "mode": "multimodal",
+  "video_backbone": "mobilenet_v2",
+  "sensor_backbone": "inception_time",
+  "multimodal": {
+    "accuracy": 0.7546948356807511,
+    "macro_f1": 0.746400038792604,
+    "macro_precision": 0.7770245107404076,
+    "macro_recall": 0.7537878787878788,
+    "per_class": {
+      "crouching": {
+        "precision": 0.6574074074074074,
+        "recall": 0.8452380952380952,
+        "f1": 0.7395833333333334
+      },
+      "jumping": {
+        "precision": 0.36,
+        "recall": 0.32142857142857145,
+        "f1": 0.33962264150943394
+      },
+      "kicking": {
+        "precision": 0.5824175824175825,
+        "recall": 0.6309523809523809,
+        "f1": 0.6057142857142858
+      },
+      "pointing": {
+        "precision": 1.0,
+        "recall": 0.6666666666666666,
+        "f1": 0.8
+      },
+      "running": {
+        "precision": 1.0,
+        "recall": 0.47619047619047616,
+        "f1": 0.6451612903225806
+      },
+      "sitting": {
+        "precision": 0.8275862068965517,
+        "recall": 1.0,
+        "f1": 0.9056603773584906
+      },
+      "standing": {
+        "precision": 0.6722689075630253,
+        "recall": 0.9523809523809523,
+        "f1": 0.7881773399014779
+      },
+      "using_phone": {
+        "precision": 0.8344370860927153,
+        "recall": 0.9545454545454546,
+        "f1": 0.8904593639575972
+      },
+      "walking": {
+        "precision": 0.8923076923076924,
+        "recall": 0.6904761904761905,
+        "f1": 0.7785234899328859
+      },
+      "waving_hand": {
+        "precision": 0.9438202247191011,
+        "recall": 1.0,
+        "f1": 0.9710982658959537
+      }
+    },
+    "confusion_matrix": [
+      [
+        71,
+        1,
+        1,
+        0,
+        0,
+        5,
+        3,
+        3,
+        0,
+        0
+      ],
+      [
+        34,
+        27,
+        13,
+        0,
+        0,
+        0,
+        10,
+        0,
+        0,
+        0
+      ],
+      [
+        1,
+        6,
+        53,
+        0,
+        0,
+        0,
+        24,
+        0,
+        0,
+        0
+      ],
+      [
+        0,
+        0,
+        0,
+        56,
+        0,
+        0,
+        1,
+        22,
+        0,
+        5
+      ],
+      [
+        0,
+        29,
+        8,
+        0,
+        40,
+        0,
+        0,
+        0,
+        7,
+        0
+      ],
+      [
+        0,
+        0,
+        0,
+        0,
+        0,
+        48,
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        1,
+        1,
+        2,
+        0,
+        0,
+        0,
+        80,
+        0,
+        0,
+        0
+      ],
+      [
+        1,
+        0,
+        0,
+        0,
+        0,
+        5,
+        0,
+        126,
+        0,
+        0
+      ],
+      [
+        0,
+        11,
+        14,
+        0,
+        0,
+        0,
+        1,
+        0,
+        58,
+        0
+      ],
+      [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        84
+      ]
+    ],
+    "total_samples": 852,
+    "roc_auc_ovr": 0.966230205702862,
+    "average_precision_macro": 0.8499824927231782
+  },
+  "metrics": {
+    "accuracy": 0.7546948356807511,
+    "macro_f1": 0.746400038792604,
+    "macro_precision": 0.7770245107404076,
+    "macro_recall": 0.7537878787878788,
+    "per_class": {
+      "crouching": {
+        "precision": 0.6574074074074074,
+        "recall": 0.8452380952380952,
+        "f1": 0.7395833333333334
+      },
+      "jumping": {
+        "precision": 0.36,
+        "recall": 0.32142857142857145,
+        "f1": 0.33962264150943394
+      },
+      "kicking": {
+        "precision": 0.5824175824175825,
+        "recall": 0.6309523809523809,
+        "f1": 0.6057142857142858
+      },
+      "pointing": {
+        "precision": 1.0,
+        "recall": 0.6666666666666666,
+        "f1": 0.8
+      },
+      "running": {
+        "precision": 1.0,
+        "recall": 0.47619047619047616,
+        "f1": 0.6451612903225806
+      },
+      "sitting": {
+        "precision": 0.8275862068965517,
+        "recall": 1.0,
+        "f1": 0.9056603773584906
+      },
+      "standing": {
+        "precision": 0.6722689075630253,
+        "recall": 0.9523809523809523,
+        "f1": 0.7881773399014779
+      },
+      "using_phone": {
+        "precision": 0.8344370860927153,
+        "recall": 0.9545454545454546,
+        "f1": 0.8904593639575972
+      },
+      "walking": {
+        "precision": 0.8923076923076924,
+        "recall": 0.6904761904761905,
+        "f1": 0.7785234899328859
+      },
+      "waving_hand": {
+        "precision": 0.9438202247191011,
+        "recall": 1.0,
+        "f1": 0.9710982658959537
+      }
+    },
+    "confusion_matrix": [
+      [
+        71,
+        1,
+        1,
+        0,
+        0,
+        5,
+        3,
+        3,
+        0,
+        0
+      ],
+      [
+        34,
+        27,
+        13,
+        0,
+        0,
+        0,
+        10,
+        0,
+        0,
+        0
+      ],
+      [
+        1,
+        6,
+        53,
+        0,
+        0,
+        0,
+        24,
+        0,
+        0,
+        0
+      ],
+      [
+        0,
+        0,
+        0,
+        56,
+        0,
+        0,
+        1,
+        22,
+        0,
+        5
+      ],
+      [
+        0,
+        29,
+        8,
+        0,
+        40,
+        0,
+        0,
+        0,
+        7,
+        0
+      ],
+      [
+        0,
+        0,
+        0,
+        0,
+        0,
+        48,
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        1,
+        1,
+        2,
+        0,
+        0,
+        0,
+        80,
+        0,
+        0,
+        0
+      ],
+      [
+        1,
+        0,
+        0,
+        0,
+        0,
+        5,
+        0,
+        126,
+        0,
+        0
+      ],
+      [
+        0,
+        11,
+        14,
+        0,
+        0,
+        0,
+        1,
+        0,
+        58,
+        0
+      ],
+      [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        84
+      ]
+    ],
+    "total_samples": 852,
+    "roc_auc_ovr": 0.966230205702862,
+    "average_precision_macro": 0.8499824927231782
+  }
+}

@@ -1,0 +1,10 @@
+model,missing_files,test_membership_verified,test_plot_count,status
+Primary Multimodal,,True,10,PASS
+Additional Multimodal Fusion,,True,10,PASS
+Gated Multimodal TCN,,True,10,PASS
+Sensor-only TCN,,True,10,PASS
+Sensor-only InceptionTime,,True,10,PASS
+Retrained MobileNetV2,,True,10,PASS
+Original MobileNetV2,,True,10,PASS
+Retrained Custom CNN V2,,True,10,PASS
+Original Custom CNN,,True,10,PASS
