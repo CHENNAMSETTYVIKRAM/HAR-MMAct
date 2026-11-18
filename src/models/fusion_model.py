@@ -2,7 +2,7 @@
 fusion_model.py - Multimodal Feature Fusion and Unimodal Baselines for HAR_MMAct
 """
 
-from typing import Optional, Tuple
+from typing import Optional
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -14,14 +14,15 @@ from src.models.video_branch import (
     CustomCNNVideoBranch,
     MobileNetV2VideoBranch,
 )
+from src.models.r3d18_branch import R3D18VideoBranch
 from src.models.sensor_branch import InceptionTimeSensorBranch, Sensor1DCNNBranch, TemporalConvSensorBranch
 
 
 class MultimodalHARModel(nn.Module):
     """
     Multimodal Human Activity Recognition model fusing video and sensor streams.
-    Supports pretrained ResNet-18, MobileNetV2, or Custom CNN for video, and InceptionTime
-    or 1D-CNN for sensor time series. Also natively supports unimodal evaluation modes.
+    Supports pretrained ResNet-18, R3D-18, MobileNetV2, or Custom CNN for video,
+    and InceptionTime or 1D-CNN for sensor time series. Also supports unimodal modes.
     """
 
     def __init__(
@@ -33,9 +34,9 @@ class MultimodalHARModel(nn.Module):
         sensor_embed_dim: int = 128,
         fusion_hidden_dim: int = 128,
         dropout: float = 0.3,
-        mode: str = "multimodal",  # 'multimodal', 'video_only', 'sensor_only'
-        video_backbone: str = "resnet18",  # 'resnet18', 'mobilenet_v2', 'cnn', 'custom_cnn'
-        sensor_backbone: str = "inception_time",  # 'inception_time' or 'cnn1d'
+        mode: str = "multimodal",
+        video_backbone: str = "resnet18",
+        sensor_backbone: str = "inception_time",
         pretrained_video: bool = True,
         pretrained_path: str = "outputs/pretrained/resnet18.pth",
         freeze_video_backbone: bool = False,
@@ -48,39 +49,34 @@ class MultimodalHARModel(nn.Module):
         self.sensor_backbone_name = sensor_backbone
         self.fusion_strategy = fusion_strategy
 
-        # Video branch initialization
         if video_backbone in ["mobilenet_v2", "mobilenet"]:
             self.video_branch = MobileNetV2VideoBranch(
-                in_channels=video_channels,
-                embedding_dim=video_embed_dim,
-                dropout=dropout,
+                in_channels=video_channels, embedding_dim=video_embed_dim, dropout=dropout,
                 pretrained=pretrained_video,
                 pretrained_path=pretrained_path if ("mobilenet" in pretrained_path.lower()) else None,
                 freeze_backbone=freeze_video_backbone,
             )
         elif video_backbone == "resnet18":
             self.video_branch = ResNet18VideoBranch(
-                in_channels=video_channels,
-                embedding_dim=video_embed_dim,
-                dropout=dropout,
-                pretrained=pretrained_video,
-                pretrained_path=pretrained_path,
+                in_channels=video_channels, embedding_dim=video_embed_dim, dropout=dropout,
+                pretrained=pretrained_video, pretrained_path=pretrained_path,
                 freeze_backbone=freeze_video_backbone,
+            )
+        elif video_backbone == "r3d18":
+            self.video_branch = R3D18VideoBranch(
+                in_channels=video_channels, embedding_dim=video_embed_dim, dropout=dropout,
+                pretrained=pretrained_video, freeze_backbone=freeze_video_backbone,
             )
         elif video_backbone in ["original_cnn", "lightweight"]:
             self.video_branch = OriginalCNNVideoBranch(
-                in_channels=video_channels,
-                embedding_dim=video_embed_dim,
-                dropout=dropout,
+                in_channels=video_channels, embedding_dim=video_embed_dim, dropout=dropout,
             )
-        else:  # 'cnn', 'custom_cnn', 'improved_cnn'
+        else:
             self.video_branch = CustomCNNVideoBranch(
-                in_channels=video_channels,
-                embedding_dim=video_embed_dim,
+                in_channels=video_channels, embedding_dim=video_embed_dim,
                 dropout=max(0.35, dropout),
             )
 
-        # Sensor branch initialization
         if sensor_backbone == "inception_time":
             self.sensor_branch = InceptionTimeSensorBranch(
                 in_channels=sensor_channels, embedding_dim=sensor_embed_dim, dropout=dropout
@@ -94,43 +90,28 @@ class MultimodalHARModel(nn.Module):
                 in_channels=sensor_channels, embedding_dim=sensor_embed_dim, dropout=dropout
             )
 
-        # Multimodal fusion classifier
         total_embed_dim = video_embed_dim + sensor_embed_dim
         if fusion_strategy not in {"concat", "gated"}:
             raise ValueError(f"Unsupported fusion_strategy={fusion_strategy!r}")
         if fusion_strategy == "gated":
             self.fusion_gate = nn.Sequential(
-                nn.Linear(total_embed_dim, fusion_hidden_dim),
-                nn.GELU(),
-                nn.Linear(fusion_hidden_dim, 2),
+                nn.Linear(total_embed_dim, fusion_hidden_dim), nn.GELU(), nn.Linear(fusion_hidden_dim, 2)
             )
         else:
             self.fusion_gate = None
         self.fusion_classifier = nn.Sequential(
-            nn.Dropout(dropout),
-            nn.Linear(total_embed_dim, fusion_hidden_dim),
-            nn.LayerNorm(fusion_hidden_dim),
-            nn.GELU(),
-            nn.Dropout(dropout),
+            nn.Dropout(dropout), nn.Linear(total_embed_dim, fusion_hidden_dim),
+            nn.LayerNorm(fusion_hidden_dim), nn.GELU(), nn.Dropout(dropout),
             nn.Linear(fusion_hidden_dim, num_classes),
         )
-
-        # Unimodal classifiers (for isolated baseline evaluation)
         self.video_only_classifier = nn.Sequential(
-            nn.Dropout(dropout),
-            nn.Linear(video_embed_dim, fusion_hidden_dim),
-            nn.BatchNorm1d(fusion_hidden_dim),
-            nn.ReLU(inplace=True),
-            nn.Dropout(dropout),
+            nn.Dropout(dropout), nn.Linear(video_embed_dim, fusion_hidden_dim),
+            nn.BatchNorm1d(fusion_hidden_dim), nn.ReLU(inplace=True), nn.Dropout(dropout),
             nn.Linear(fusion_hidden_dim, num_classes),
         )
-
         self.sensor_only_classifier = nn.Sequential(
-            nn.Dropout(dropout),
-            nn.Linear(sensor_embed_dim, fusion_hidden_dim),
-            nn.BatchNorm1d(fusion_hidden_dim),
-            nn.ReLU(inplace=True),
-            nn.Dropout(dropout),
+            nn.Dropout(dropout), nn.Linear(sensor_embed_dim, fusion_hidden_dim),
+            nn.BatchNorm1d(fusion_hidden_dim), nn.ReLU(inplace=True), nn.Dropout(dropout),
             nn.Linear(fusion_hidden_dim, num_classes),
         )
 
@@ -140,59 +121,38 @@ class MultimodalHARModel(nn.Module):
         sensor: Optional[torch.Tensor] = None,
         override_mode: Optional[str] = None,
     ) -> torch.Tensor:
-        """
-        Forward pass.
-        Args:
-            video: shape (B, 3, T, H, W)
-            sensor: shape (B, num_channels, W)
-            override_mode: Optional runtime override ('multimodal', 'video_only', 'sensor_only')
-        Returns:
-            logits: shape (B, num_classes)
-        """
         active_mode = override_mode or self.mode
-
         if active_mode == "video_only":
             if video is None:
                 raise ValueError("Video tensor required for video_only mode.")
-            v_embed = self.video_branch(video)
-            return self.video_only_classifier(v_embed)
-
-        elif active_mode == "sensor_only":
+            return self.video_only_classifier(self.video_branch(video))
+        if active_mode == "sensor_only":
             if sensor is None:
                 raise ValueError("Sensor tensor required for sensor_only mode.")
-            s_embed = self.sensor_branch(sensor)
-            return self.sensor_only_classifier(s_embed)
-
-        else:  # Multimodal mode
-            if video is None or sensor is None:
-                raise ValueError("Both video and sensor tensors required for multimodal fusion.")
-            v_embed = self.video_branch(video)
-            s_embed = self.sensor_branch(sensor)
-            if self.fusion_gate is None:
-                fused = torch.cat([v_embed, s_embed], dim=1)
-            else:
-                joined = torch.cat([v_embed, s_embed], dim=1)
-                gate = torch.softmax(self.fusion_gate(joined), dim=1)
-                fused = torch.cat([v_embed * gate[:, 0:1], s_embed * gate[:, 1:2]], dim=1)
-            return self.fusion_classifier(fused)
+            return self.sensor_only_classifier(self.sensor_branch(sensor))
+        if video is None or sensor is None:
+            raise ValueError("Both video and sensor tensors required for multimodal fusion.")
+        v_embed = self.video_branch(video)
+        s_embed = self.sensor_branch(sensor)
+        if self.fusion_gate is None:
+            fused = torch.cat([v_embed, s_embed], dim=1)
+        else:
+            joined = torch.cat([v_embed, s_embed], dim=1)
+            gate = torch.softmax(self.fusion_gate(joined), dim=1)
+            fused = torch.cat([v_embed * gate[:, 0:1], s_embed * gate[:, 1:2]], dim=1)
+        return self.fusion_classifier(fused)
 
     @torch.no_grad()
     def predict_video_only(self, video: torch.Tensor) -> torch.Tensor:
-        """Returns softmax probabilities for video stream alone."""
         self.eval()
-        logits = self.forward(video=video, override_mode="video_only")
-        return F.softmax(logits, dim=-1)
+        return F.softmax(self.forward(video=video, override_mode="video_only"), dim=-1)
 
     @torch.no_grad()
     def predict_sensor_only(self, sensor: torch.Tensor) -> torch.Tensor:
-        """Returns softmax probabilities for sensor stream alone."""
         self.eval()
-        logits = self.forward(sensor=sensor, override_mode="sensor_only")
-        return F.softmax(logits, dim=-1)
+        return F.softmax(self.forward(sensor=sensor, override_mode="sensor_only"), dim=-1)
 
     @torch.no_grad()
     def predict_fused(self, video: torch.Tensor, sensor: torch.Tensor) -> torch.Tensor:
-        """Returns softmax probabilities for multimodal fused stream."""
         self.eval()
-        logits = self.forward(video=video, sensor=sensor, override_mode="multimodal")
-        return F.softmax(logits, dim=-1)
+        return F.softmax(self.forward(video=video, sensor=sensor, override_mode="multimodal"), dim=-1)
