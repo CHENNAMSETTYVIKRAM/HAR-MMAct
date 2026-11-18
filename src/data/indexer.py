@@ -3,7 +3,8 @@ indexer.py - Multimodal and video-only dataset indexing for MMAct.
 
 The default ``index()`` method remains the strict multimodal path: it pairs
 videos with all required sensor modalities. ``index_videos()`` is an explicit
-video-only path and does not inspect sensor files.
+video-only path and does not inspect sensor files. Passing an empty required
+sensor list to ``index()`` also selects video-only indexing.
 """
 
 import os
@@ -93,7 +94,11 @@ class MMActIndexer:
     def __init__(self, dataset_root: Path, required_sensor_modalities: Optional[List[str]] = None,
                  target_classes: Optional[List[str]] = None):
         self.dataset_root = Path(dataset_root)
-        self.required_sensors = required_sensor_modalities or ["acc_phone", "acc_watch", "gyro"]
+        self.required_sensors = (
+            ["acc_phone", "acc_watch", "gyro"]
+            if required_sensor_modalities is None
+            else list(required_sensor_modalities)
+        )
         self.target_classes = set(target_classes or VERIFIED_TARGET_CLASSES)
 
     @staticmethod
@@ -187,7 +192,11 @@ class MMActIndexer:
         return report
 
     def index(self) -> IndexerReport:
-        """Scan directory and strictly pair clips with all configured sensor modalities."""
+        """Index videos, pairing all configured sensors unless in explicit video-only mode."""
+        if not self.required_sensors:
+            # This path deliberately avoids even searching for sensor files.
+            return self.index_videos()
+
         report = IndexerReport()
         if not self.dataset_root.exists():
             return report

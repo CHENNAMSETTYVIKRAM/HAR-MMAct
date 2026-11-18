@@ -32,7 +32,7 @@ def test_video_only_indexing_needs_no_sensor_files_and_filters_classes(tmp_path)
 
 def test_video_only_subject_split_counts_ids_and_membership():
     samples = []
-    # Equivalent synthetic split with verified sample counts: 3,830 / 945 / 852.
+    # Synthetic fixture matches the verified 3,830 / 945 / 852 partition sizes.
     for subject_num, count in [(i, 273 + (1 if i <= 8 else 0)) for i in range(1, 15)]:
         for n in range(count):
             action = VERIFIED_TARGET_CLASSES[n % len(VERIFIED_TARGET_CLASSES)]
@@ -86,21 +86,52 @@ def test_video_only_dataset_does_not_read_sensors(tmp_path):
     assert sample_id == "video_sample"
 
 
-def test_multimodal_indexer_still_requires_all_sensors(tmp_path):
+def test_indexer_none_uses_three_default_sensor_requirements(tmp_path):
+    assert MMActIndexer(tmp_path, required_sensor_modalities=None).required_sensors == [
+        "acc_phone", "acc_watch", "gyro"
+    ]
+
+
+def test_indexer_empty_list_means_video_only_and_skips_sensor_discovery(tmp_path, monkeypatch):
+    root = tmp_path / "video_only"
+    video = make_video(root, "subject01", "scene1", "session1", "cam1", "walking")
+    indexer = MMActIndexer(root, required_sensor_modalities=[])
+    assert indexer.required_sensors == []
+
+    def forbidden_sensor_discovery(*_args, **_kwargs):
+        raise AssertionError("Video-only indexing must not search for sensor CSVs")
+
+    monkeypatch.setattr(indexer, "parse_sensor_path", forbidden_sensor_discovery)
+    monkeypatch.setattr(indexer, "find_files_recursively", lambda path, extensions: (
+        [video] if extensions == {".mp4"} else forbidden_sensor_discovery()
+    ))
+    report = indexer.index()
+    assert report.paired_samples_count == 1
+    assert report.paired_samples[0].sample_id == "subject1_scene1_session1_cam1_walking"
+    assert report.paired_samples[0].sensor_paths == {}
+
+
+def test_default_multimodal_indexer_still_excludes_video_missing_required_sensors(tmp_path):
     root = tmp_path / "multimodal"
     video = make_video(root, "subject1", "scene1", "session1", "cam1", "walking")
-    multimodal = MMActIndexer(root).index()
-    video_only = MMActIndexer(root).index_videos()
-    assert multimodal.paired_samples_count == 0
-    assert len(multimodal.missing_sensors) == 1
-    assert video_only.paired_samples_count == 1
-    assert video_only.paired_samples[0].sample_id == "subject1_scene1_session1_cam1_walking"
 
+    indexer = MMActIndexer(root)
+    assert indexer.required_sensors == ["acc_phone", "acc_watch", "gyro"]
+    report = indexer.index()
+    assert report.paired_samples_count == 0
+    assert len(report.missing_sensors) == 1
+    assert report.missing_sensors[0]["video_path"] == str(video)
+
+
+def test_multimodal_indexer_pairs_when_all_required_sensors_exist(tmp_path):
+    root = tmp_path / "paired"
+    video = make_video(root, "subject1", "scene1", "session1", "cam1", "walking")
     for modality in ("acc_phone_clip", "acc_watch_clip", "gyro_clip"):
         sensor = root / "trimmed" / "sensors" / modality / "subject1" / "scene1" / "session1" / "walking.csv"
         sensor.parent.mkdir(parents=True, exist_ok=True)
         sensor.write_text("time,x,y,z\n0,0,0,0\n")
-    paired = MMActIndexer(root).index()
-    assert paired.paired_samples_count == 1
-    assert set(paired.paired_samples[0].sensor_paths) == {"acc_phone", "acc_watch", "gyro"}
-    assert paired.paired_samples[0].video_path == video
+
+    report = MMActIndexer(root).index()
+    assert report.paired_samples_count == 1
+    assert report.paired_samples[0].video_path == video
+    assert set(report.paired_samples[0].sensor_paths) == {"acc_phone", "acc_watch", "gyro"}
