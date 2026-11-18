@@ -103,8 +103,8 @@ def main():
     data_root = Path(args.data_root)
     if not data_root.exists():
         raise FileNotFoundError(f"Dataset directory not found: {data_root.resolve()}")
-    # Explicit video-only indexing intentionally does not inspect or require sensors.
-    report = MMActIndexer(dataset_root=data_root).index_videos()
+    # Explicit empty modality requirements select video-only indexing without sensor scans.
+    report = MMActIndexer(dataset_root=data_root, required_sensor_modalities=[]).index()
     if not report.paired_samples:
         raise RuntimeError(f"No valid target-class videos found under {data_root}.")
     if report.paired_samples_count != EXPECTED_TOTAL_VIDEOS:
