@@ -291,3 +291,43 @@ def test_screening_verifier_logic(tmp_path):
         validate_single_experiment(corrupted_dir, canonical_train_ids, canonical_val_ids, expected_epochs=12)
 
 
+def test_historical_benchmark_manifest_schema_and_test_isolation():
+    """
+    Audits the historical benchmark artifacts in outputs/mobilenet_v2:
+    1. Confirms the historical manifest schema lacks individual train/val sample IDs
+       (proving why train_sample_ids lookup raised KeyError).
+    2. Confirms aggregate counts (3,795 train, 780 val, 852 test).
+    3. Confirms that historical final_test_predictions.csv isolates test subjects 18-20.
+    """
+    import json
+    import pandas as pd
+    from pathlib import Path
+
+    manifest_path = Path("outputs/mobilenet_v2/experiment_manifest.json")
+    assert manifest_path.exists(), "Historical mobilenet_v2 manifest must exist"
+
+    with open(manifest_path, "r", encoding="utf-8") as f:
+        bench_manifest = json.load(f)
+
+    # Prove absence of individual sample ID lists
+    assert "train_sample_ids" not in bench_manifest
+    assert "val_sample_ids" not in bench_manifest
+    assert "test_sample_ids" not in bench_manifest
+
+    # Prove presence of aggregate counts and split definition
+    assert bench_manifest["train_samples_count"] == 3795
+    assert bench_manifest["val_samples_count"] == 780
+    assert bench_manifest["test_samples_count"] == 852
+    assert bench_manifest["split_strategy"] == "subject"
+
+    # Verify historical test predictions exist and isolate subjects 18-20
+    test_preds_path = Path("outputs/mobilenet_v2/final_test_predictions.csv")
+    assert test_preds_path.exists(), "Historical test predictions must exist"
+    df_test = pd.read_csv(test_preds_path)
+    assert len(df_test) == 852
+
+    test_subjects = {s.split("_")[0] for s in df_test["sample_id"]}
+    assert test_subjects == {"subject18", "subject19", "subject20"}
+
+
+
