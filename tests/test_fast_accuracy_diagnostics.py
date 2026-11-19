@@ -38,7 +38,7 @@ def test_custom_cnn_shapes_gradients_and_trainable_params():
     loss = nn.CrossEntropyLoss()(logits, labels)
     loss.backward()
 
-    conv_named = [name for name, p in branch.named_parameters() if p.grad is not None and p.grad.abs().sum() > 0]
+    conv_named = [name for name, p in model.video_branch.named_parameters() if p.grad is not None and p.grad.abs().sum() > 0]
     classifier_named = [name for name, p in model.video_only_classifier.named_parameters() if p.grad is not None and p.grad.abs().sum() > 0]
     assert conv_named
     assert classifier_named
@@ -84,6 +84,7 @@ def test_mobilenet_normalization_freeze_and_optimizer_state():
     assert all(not p.requires_grad for p in frozen.backbone.parameters())
     assert all(p.requires_grad for p in frozen.temporal_fc.parameters())
 
+    frozen.eval()
     video = torch.randn(1, 3, 2, 64, 64)
     embedding = frozen(video)
     assert embedding.shape == (1, 128)
@@ -122,3 +123,70 @@ def test_retrained_split_difference_is_exactly_standing():
         retrained = manifests[1][key]
         differing = {name: retrained[name] - original[name] for name in original if retrained[name] != original[name]}
         assert differing == {"standing": 4}
+
+
+def test_pre_indexing_subject_exclusion(tmp_path):
+    from src.data.indexer import MMActIndexer, PairedSample
+
+    # Create dummy directory tree with subjects 1, 15, and 18 (test)
+    for subj in ["subject1", "subject15", "subject18"]:
+        d = tmp_path / "trimmed" / "video" / "cross_scene" / "trainval" / subj / "cam1" / "scene1" / "session1"
+        d.mkdir(parents=True, exist_ok=True)
+        (d / "crouching.mp4").write_bytes(b"dummy_video_bytes")
+
+    # Verify find_files_recursively prunes subject18
+    all_files = MMActIndexer.find_files_recursively(
+        tmp_path, {".mp4"}, excluded_dir_names={"subject18"}
+    )
+    file_strs = [str(f) for f in all_files]
+    assert any("subject1" in f for f in file_strs)
+    assert any("subject15" in f for f in file_strs)
+    assert not any("subject18" in f for f in file_strs), "subject18 was not pruned during directory traversal!"
+
+    # Verify indexer does not construct PairedSample for subject18
+    indexer = MMActIndexer(
+        dataset_root=tmp_path,
+        required_sensor_modalities=[],
+        excluded_subjects={"subject18"},
+        allowed_subjects={"subject1", "subject15"},
+    )
+    report = indexer.index()
+    assert len(report.paired_samples) == 2
+    indexed_subjects = {s.subject for s in report.paired_samples}
+    assert indexed_subjects == {"subject1", "subject15"}
+    assert "subject18" not in indexed_subjects
+
+
+def test_paired_sample_serialization_and_manifest_roundtrip(tmp_path):
+    from src.data.indexer import PairedSample
+
+    sample = PairedSample(
+        sample_id="subject1_scene1_session1_cam1_crouching",
+        action="crouching",
+        label_idx=0,
+        subject="subject1",
+        scene="scene1",
+        session="session1",
+        cam="cam1",
+        video_path=tmp_path / "dummy.mp4",
+        sensor_paths={"acc_phone": tmp_path / "sensor.csv"},
+    )
+
+    d = sample.to_dict()
+    restored = PairedSample.from_dict(d)
+    assert restored.sample_id == sample.sample_id
+    assert restored.action == sample.action
+    assert restored.label_idx == sample.label_idx
+    assert restored.subject == sample.subject
+    assert restored.video_path == sample.video_path
+    assert restored.sensor_paths["acc_phone"] == sample.sensor_paths["acc_phone"]
+
+
+def test_mobilenet_verified_pretrained_gate():
+    from src.models.video_branch import MobileNetV2VideoBranch
+    import pytest
+
+    branch = MobileNetV2VideoBranch(pretrained=True, require_pretrained=True)
+    assert branch.pretrained_loaded is True
+    assert branch.pretrained_source in {"torchvision-default", "torchvision-legacy", "pure-pytorch-external"}
+

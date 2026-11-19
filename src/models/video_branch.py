@@ -268,10 +268,17 @@ class MobileNetV2VideoBranch(nn.Module):
         pretrained: bool = True,
         pretrained_path: Optional[str] = None,
         freeze_backbone: bool = False,
+        require_pretrained: bool = False,
     ):
         super().__init__()
         self.embedding_dim = embedding_dim
         self.last_channel = 1280
+        self.normalization_mean = (0.485, 0.456, 0.406)
+        self.normalization_std = (0.229, 0.224, 0.225)
+        self.pretrained = pretrained
+        self.pretrained_loaded = False
+        self.freeze_backbone = freeze_backbone
+        self.pretrained_source = "pure-pytorch-random"
 
         loaded_torchvision = False
         if pretrained_path is None:
@@ -281,14 +288,20 @@ class MobileNetV2VideoBranch(nn.Module):
                     try:
                         from torchvision.models import MobileNet_V2_Weights
                         tv_mobilenet = models.mobilenet_v2(weights=MobileNet_V2_Weights.DEFAULT)
+                        self.pretrained_source = "torchvision-default"
+                        self.pretrained_loaded = True
                     except Exception:
                         tv_mobilenet = models.mobilenet_v2(pretrained=True)
+                        self.pretrained_source = "torchvision-legacy"
+                        self.pretrained_loaded = True
                     print("[MobileNetV2VideoBranch] Initialized with official pretrained ImageNet weights via torchvision.")
                 else:
                     try:
                         tv_mobilenet = models.mobilenet_v2(weights=None)
                     except Exception:
                         tv_mobilenet = models.mobilenet_v2(pretrained=False)
+                    self.pretrained_source = "torchvision-random"
+                    self.pretrained_loaded = False
                     print("[MobileNetV2VideoBranch] Initialized unweighted torchvision MobileNetV2 architecture.")
 
                 self.backbone = tv_mobilenet.features
@@ -303,7 +316,18 @@ class MobileNetV2VideoBranch(nn.Module):
             if pretrained_path and os.path.exists(pretrained_path):
                 state_dict = torch.load(pretrained_path, map_location="cpu")
                 self.backbone.load_state_dict(state_dict, strict=False)
+                self.pretrained_source = "pure-pytorch-external"
+                self.pretrained_loaded = True
                 print(f"[MobileNetV2VideoBranch] Loaded weights from {pretrained_path}")
+            else:
+                self.pretrained_source = "pure-pytorch-random"
+                self.pretrained_loaded = False
+
+        if pretrained and require_pretrained and not self.pretrained_loaded:
+            raise RuntimeError(
+                f"CRITICAL: Failed to load pretrained ImageNet weights for MobileNetV2! "
+                f"Source: {self.pretrained_source}. Aborting to prevent silent fallback to random initialization."
+            )
 
         if freeze_backbone:
             for p in self.backbone.parameters():
@@ -403,24 +427,28 @@ class CustomCNNVideoBranch(nn.Module):
         self,
         in_channels: int = 3,
         embedding_dim: int = 128,
-        dropout: float = 0.4,
+        dropout: float = 0.2,
+        spatial_dropout1: float = 0.10,
+        spatial_dropout2: float = 0.15,
     ):
         super().__init__()
         self.embedding_dim = embedding_dim
+        self.spatial_dropout1 = spatial_dropout1
+        self.spatial_dropout2 = spatial_dropout2
 
-        # Frame-level 2D feature extractor with spatial dropout
+        # Frame-level 2D feature extractor with configurable spatial dropout
         self.features = nn.Sequential(
             nn.Conv2d(in_channels, 32, kernel_size=3, stride=2, padding=1, bias=False),
             nn.BatchNorm2d(32),
             nn.ReLU(inplace=True),
             nn.MaxPool2d(kernel_size=2, stride=2),
-            nn.Dropout2d(0.15),
+            nn.Dropout2d(spatial_dropout1),
 
             nn.Conv2d(32, 64, kernel_size=3, stride=2, padding=1, bias=False),
             nn.BatchNorm2d(64),
             nn.ReLU(inplace=True),
             nn.MaxPool2d(kernel_size=2, stride=2),
-            nn.Dropout2d(0.20),
+            nn.Dropout2d(spatial_dropout2),
 
             nn.Conv2d(64, 128, kernel_size=3, stride=1, padding=1, bias=False),
             nn.BatchNorm2d(128),

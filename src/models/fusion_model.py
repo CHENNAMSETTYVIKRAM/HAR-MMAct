@@ -40,6 +40,9 @@ class MultimodalHARModel(nn.Module):
         pretrained_path: str = "outputs/pretrained/resnet18.pth",
         freeze_video_backbone: bool = False,
         fusion_strategy: str = "concat",
+        spatial_dropout1: float = 0.10,
+        spatial_dropout2: float = 0.15,
+        require_pretrained: bool = False,
     ):
         super().__init__()
         self.num_classes = num_classes
@@ -57,6 +60,7 @@ class MultimodalHARModel(nn.Module):
                 pretrained=pretrained_video,
                 pretrained_path=pretrained_path if ("mobilenet" in pretrained_path.lower()) else None,
                 freeze_backbone=freeze_video_backbone,
+                require_pretrained=require_pretrained,
             )
         elif video_backbone == "resnet18":
             self.video_branch = ResNet18VideoBranch(
@@ -77,7 +81,9 @@ class MultimodalHARModel(nn.Module):
             self.video_branch = CustomCNNVideoBranch(
                 in_channels=video_channels,
                 embedding_dim=video_embed_dim,
-                dropout=max(0.35, dropout),
+                dropout=dropout,
+                spatial_dropout1=spatial_dropout1,
+                spatial_dropout2=spatial_dropout2,
             )
 
         # Sensor branch initialization

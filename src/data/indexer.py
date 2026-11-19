@@ -47,6 +47,20 @@ class PairedSample:
             "sensor_paths": {k: str(v) for k, v in self.sensor_paths.items()},
         }
 
+    @classmethod
+    def from_dict(cls, d: dict) -> "PairedSample":
+        return cls(
+            sample_id=d["sample_id"],
+            action=d["action"],
+            label_idx=int(d["label_idx"]),
+            subject=d["subject"],
+            scene=d["scene"],
+            session=d["session"],
+            cam=d["cam"],
+            video_path=Path(d["video_path"]),
+            sensor_paths={k: Path(v) for k, v in d.get("sensor_paths", {}).items()},
+        )
+
 
 @dataclass
 class IndexerReport:
@@ -114,14 +128,18 @@ class MMActIndexer:
         dataset_root: Path,
         required_sensor_modalities: Optional[List[str]] = None,
         target_classes: Optional[List[str]] = None,
+        excluded_subjects: Optional[Set[str]] = None,
+        allowed_subjects: Optional[Set[str]] = None,
     ):
         self.dataset_root = Path(dataset_root)
-        self.required_sensors = required_sensor_modalities or [
-            "acc_phone",
-            "acc_watch",
-            "gyro",
-        ]
+        self.required_sensors = (
+            required_sensor_modalities
+            if required_sensor_modalities is not None
+            else ["acc_phone", "acc_watch", "gyro"]
+        )
         self.target_classes = set(target_classes or VERIFIED_TARGET_CLASSES)
+        self.excluded_subjects = set(excluded_subjects) if excluded_subjects else set()
+        self.allowed_subjects = set(allowed_subjects) if allowed_subjects else None
 
     @staticmethod
     def normalize_action_name(stem: str) -> str:
@@ -219,8 +237,16 @@ class MMActIndexer:
         return None
 
     @staticmethod
-    def find_files_recursively(root: Path, extensions: Set[str]) -> List[Path]:
-        """Find all files with matching extensions, safely traversing symlinks with cycle protection."""
+    def find_files_recursively(
+        root: Path,
+        extensions: Set[str],
+        excluded_dir_names: Optional[Set[str]] = None,
+        allowed_dir_names: Optional[Set[str]] = None,
+    ) -> List[Path]:
+        """
+        Find all files with matching extensions, safely traversing symlinks with cycle protection.
+        Prunes excluded directory names in-place during os.walk to avoid scanning excluded subjects.
+        """
         results: List[Path] = []
         root_path = Path(root)
         if not root_path.exists():
@@ -237,6 +263,19 @@ class MMActIndexer:
                 continue
             visited_dirs.add(dir_key)
 
+            # In-place directory pruning to avoid descending into excluded subject directories
+            if excluded_dir_names or allowed_dir_names:
+                pruned = []
+                for d in dirnames:
+                    norm_d = MMActIndexer.normalize_identifier(d, "subject")
+                    if excluded_dir_names and (d in excluded_dir_names or norm_d in excluded_dir_names):
+                        continue
+                    if allowed_dir_names is not None and norm_d.startswith("subject"):
+                        if norm_d not in allowed_dir_names:
+                            continue
+                    pruned.append(d)
+                dirnames[:] = pruned
+
             for fname in filenames:
                 ext = os.path.splitext(fname)[1].lower()
                 if ext in extensions:
@@ -250,14 +289,25 @@ class MMActIndexer:
         if not self.dataset_root.exists():
             return report
 
-        # 1. Discover all videos (safely traversing symlinks)
+        # 1. Discover all videos (safely traversing symlinks with pre-indexing pruning)
         video_map: Dict[Tuple[str, str, str, str, str], Path] = {}
-        for vid_file in self.find_files_recursively(self.dataset_root, {".mp4"}):
+        for vid_file in self.find_files_recursively(
+            self.dataset_root,
+            {".mp4"},
+            excluded_dir_names=self.excluded_subjects,
+            allowed_dir_names=self.allowed_subjects,
+        ):
             report.total_video_files_found += 1
             parsed = self.parse_video_path(vid_file)
             if not parsed:
                 continue
             subj, cam, scene, session, action = parsed
+
+            # Pre-sample-construction subject filter
+            if subj in self.excluded_subjects:
+                continue
+            if self.allowed_subjects is not None and subj not in self.allowed_subjects:
+                continue
 
             if action not in self.target_classes:
                 report.unknown_label_files.append(str(vid_file))

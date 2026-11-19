@@ -310,10 +310,14 @@ class FastMMActStager:
         canonical_dir: Path,
         input_roots: Optional[List[Path]] = None,
         max_scan_depth: int = 4,
+        excluded_subjects: Optional[Set[str]] = None,
+        allowed_subjects: Optional[Set[str]] = None,
     ):
         self.canonical_dir = Path(canonical_dir)
         self.input_roots = input_roots
         self.max_scan_depth = max_scan_depth
+        self.excluded_subjects = set(excluded_subjects) if excluded_subjects else set()
+        self.allowed_subjects = set(allowed_subjects) if allowed_subjects else None
 
         self.canonical_video = self.canonical_dir / "trimmed" / "video"
         self.canonical_sensors = self.canonical_dir / "trimmed" / "sensors"
@@ -664,14 +668,23 @@ class FastMMActStager:
                 if arc_cand.is_file() and arc_cand.suffix.lower() in {".zip", ".tar", ".gz", ".tgz"}:
                     discovered_archives.append(arc_cand)
 
-            # Discover all MP4 files under this root
-            all_mp4s = MMActIndexer.find_files_recursively(root, {".mp4"})
+            # Discover all MP4 files under this root (pruning excluded subject directories)
+            all_mp4s = MMActIndexer.find_files_recursively(
+                root,
+                {".mp4"},
+                excluded_dir_names=self.excluded_subjects,
+                allowed_dir_names=self.allowed_subjects,
+            )
             for mp4 in all_mp4s:
                 if is_under_canonical(mp4):
                     continue
                 parsed = MMActIndexer.parse_video_path(mp4)
                 if parsed is not None:
                     norm_s = parsed[0]
+                    if self.excluded_subjects and norm_s in self.excluded_subjects:
+                        continue
+                    if self.allowed_subjects is not None and norm_s not in self.allowed_subjects:
+                        continue
                     discovered_recordings.setdefault(parsed, []).append(mp4)
                     video_source_dirs_manifest.setdefault(norm_s, [])
                     p_parent = str(mp4.parent)

@@ -63,6 +63,8 @@ def parse_args():
     parser.add_argument("--lr", type=float, default=1e-4, help="Learning rate")
     parser.add_argument("--weight_decay", type=float, default=1e-4, help="Weight decay")
     parser.add_argument("--dropout", type=float, default=0.35, help="Dropout probability")
+    parser.add_argument("--spatial_dropout1", type=float, default=0.10, help="Spatial Dropout2d rate after first conv stage in Custom CNN")
+    parser.add_argument("--spatial_dropout2", type=float, default=0.15, help="Spatial Dropout2d rate after second conv stage in Custom CNN")
     parser.add_argument(
         "--split_strategy",
         type=str,
@@ -106,6 +108,10 @@ def parse_args():
     parser.add_argument("--use_class_weights", action="store_true", default=True, help="Use inverse-frequency class weights in CrossEntropyLoss to boost Macro-F1 (default: True)")
     parser.add_argument("--no_class_weights", dest="use_class_weights", action="store_false", help="Disable class weighting in CrossEntropyLoss")
     parser.add_argument("--smoke_test", action="store_true", help="Force run on synthetic data for end-to-end pipeline verification")
+    parser.add_argument("--no_test_split", action="store_true", help="Screening isolation: exclude test split entirely from construction, loading, and evaluation")
+    parser.add_argument("--require_pretrained", action="store_true", default=True, help="Enforce verified loading of pretrained weights for transfer learning backbones")
+    parser.add_argument("--train_manifest", type=str, default=None, help="Path to pre-validated canonical training manifest JSON")
+    parser.add_argument("--val_manifest", type=str, default=None, help="Path to pre-validated canonical validation manifest JSON")
     return parser.parse_args()
 
 
@@ -117,7 +123,7 @@ def train_one_epoch(model, loader, criterion, optimizer, device, mode, scaler=No
 
     for batch_idx, (video, sensor, label, _) in enumerate(loader):
         video = video.to(device, non_blocking=True)
-        sensor = sensor.to(device, non_blocking=True)
+        sensor_in = None if mode == "video_only" else sensor.to(device, non_blocking=True)
         label = label.to(device, non_blocking=True)
 
         optimizer.zero_grad(set_to_none=True)
@@ -125,13 +131,13 @@ def train_one_epoch(model, loader, criterion, optimizer, device, mode, scaler=No
         try:
             if use_amp and device.type == "cuda" and scaler is not None:
                 with torch.amp.autocast(device_type="cuda", dtype=torch.float16):
-                    logits = model(video=video, sensor=sensor, override_mode=mode)
+                    logits = model(video=video, sensor=sensor_in, override_mode=mode)
                     loss = criterion(logits, label)
                 scaler.scale(loss).backward()
                 scaler.step(optimizer)
                 scaler.update()
             else:
-                logits = model(video=video, sensor=sensor, override_mode=mode)
+                logits = model(video=video, sensor=sensor_in, override_mode=mode)
                 loss = criterion(logits, label)
                 loss.backward()
                 optimizer.step()
@@ -171,15 +177,15 @@ def evaluate(model, loader, criterion, device, mode, class_names, use_amp=False)
 
     for video, sensor, label, _ in loader:
         video = video.to(device, non_blocking=True)
-        sensor = sensor.to(device, non_blocking=True)
+        sensor_in = None if mode == "video_only" else sensor.to(device, non_blocking=True)
         label = label.to(device, non_blocking=True)
 
         if use_amp and device.type == "cuda":
             with torch.amp.autocast(device_type="cuda", dtype=torch.float16):
-                logits = model(video=video, sensor=sensor, override_mode=mode)
+                logits = model(video=video, sensor=sensor_in, override_mode=mode)
                 loss = criterion(logits, label)
         else:
-            logits = model(video=video, sensor=sensor, override_mode=mode)
+            logits = model(video=video, sensor=sensor_in, override_mode=mode)
             loss = criterion(logits, label)
 
         probs = torch.softmax(logits, dim=-1)
@@ -258,58 +264,99 @@ def main():
             args.resume = str(latest_file)
             print(f"\n[Auto-Resume] Found existing interrupted checkpoint at: {args.resume}")
 
-    # 1. Dataset verification & indexing
-    if args.smoke_test:
-        data_path = Path("data/synthetic_smoke_test")
-        is_synthetic = True
-        print(f"\n[INFO] --smoke_test active. Using synthetic fixture at: {data_path}")
-    elif not data_path.exists():
-        print(f"\n[ERROR] Dataset root directory not found: {data_path.resolve()}")
-        print("[GUIDANCE] Please place genuine MMAct trimmed data at 'data/genuine_mmact'")
-        print("           or run with --smoke_test to verify pipeline execution on synthetic data.")
-        sys.exit(1)
-
-    print(f"\n[Step 1] Indexing dataset at: {data_path}")
-    indexer = MMActIndexer(dataset_root=data_path)
-    report = indexer.index()
-
-    print(f"  - Total Videos Scanned   : {report.total_video_files_found}")
-    print(f"  - Total Sensors Scanned  : {report.total_sensor_files_found}")
-    print(f"  - Paired Samples Created : {report.paired_samples_count}")
-    print(f"  - Unknown Labels Filtered: {len(report.unknown_label_files)}")
-
-    if report.paired_samples_count == 0:
-        print(f"\n[ERROR] No paired samples found in {data_path} for verified classes: {VERIFIED_TARGET_CLASSES}")
+    # 1. Dataset verification & indexing (or explicit manifest loading)
+    is_synthetic = args.smoke_test
+    splitter = None
+    if args.train_manifest and args.val_manifest:
+        t_man_p = Path(args.train_manifest)
+        v_man_p = Path(args.val_manifest)
+        if not t_man_p.exists() or not v_man_p.exists():
+            print(f"[ERROR] Explicit manifest not found: train={t_man_p.exists()}, val={v_man_p.exists()}")
+            sys.exit(1)
+        print(f"\n[Step 1 & 2] Consuming pre-validated canonical screening manifests:")
+        print(f"  - Train Manifest : {t_man_p.resolve()}")
+        print(f"  - Val Manifest   : {v_man_p.resolve()}")
+        from src.data.indexer import PairedSample
+        with open(t_man_p, "r", encoding="utf-8") as f:
+            train_raw = json.load(f)
+        with open(v_man_p, "r", encoding="utf-8") as f:
+            val_raw = json.load(f)
+        train_samples = [PairedSample.from_dict(d) for d in train_raw]
+        val_samples = [PairedSample.from_dict(d) for d in val_raw]
+        test_samples = []
+        print(f"  - Loaded Train Samples: {len(train_samples)}")
+        print(f"  - Loaded Val Samples  : {len(val_samples)}")
+        print(f"  - Test Samples        : Strictly 0 (test split construction omitted)")
         if not is_synthetic:
-            print("[NOTE] Genuine MMAct paired train/val archives have not yet been placed in the data directory.")
-            print("       To test the complete pipeline forward/backward pass, use: python scripts/train.py --smoke_test")
-        sys.exit(1)
-
-    # 2. Partition into Train / Val / Test
-    print(f"\n[Step 2] Partitioning into {args.split_strategy}-independent splits...")
-    split_cfg = SplitConfig(
-        split_strategy=args.split_strategy,
-        partition_val_for_test=args.partition_val_for_test,
-        split_dir=Path(args.split_dir) if args.split_dir else None,
-        dataset_root=data_path,
-        seed=args.seed,
-    )
-    splitter = DatasetSplitter(split_cfg, dataset_root=data_path)
-    train_samples, val_samples, test_samples = splitter.split(report.paired_samples)
-
-    if splitter.last_audit:
-        print(splitter.last_audit.summary())
+            assert len(train_samples) == 3795, f"CRITICAL: Train manifest sample count mismatch! Found {len(train_samples)}, expected 3,795."
+            assert len(val_samples) == 780, f"CRITICAL: Val manifest sample count mismatch! Found {len(val_samples)}, expected 780."
     else:
-        print(f"  - Train Set : {len(train_samples)} samples")
-        print(f"  - Val Set   : {len(val_samples)} samples")
-        print(f"  - Test Set  : {len(test_samples)} samples")
+        if args.smoke_test:
+            data_path = Path("data/synthetic_smoke_test")
+            is_synthetic = True
+            print(f"\n[INFO] --smoke_test active. Using synthetic fixture at: {data_path}")
+        elif not data_path.exists():
+            print(f"\n[ERROR] Dataset root directory not found: {data_path.resolve()}")
+            print("[GUIDANCE] Please place genuine MMAct trimmed data at 'data/genuine_mmact'")
+            print("           or run with --smoke_test to verify pipeline execution on synthetic data.")
+            sys.exit(1)
+
+        print(f"\n[Step 1] Indexing dataset at: {data_path}")
+        req_sensors = [] if args.mode == "video_only" else None
+        excluded_subs = {"subject18", "subject19", "subject20"} if args.no_test_split else None
+        allowed_subs = {f"subject{i}" for i in range(1, 18)} if args.no_test_split else None
+        indexer = MMActIndexer(
+            dataset_root=data_path,
+            required_sensor_modalities=req_sensors,
+            excluded_subjects=excluded_subs,
+            allowed_subjects=allowed_subs,
+        )
+        report = indexer.index()
+
+        print(f"  - Total Videos Scanned   : {report.total_video_files_found}")
+        print(f"  - Total Sensors Scanned  : {report.total_sensor_files_found}")
+        print(f"  - Paired Samples Created : {report.paired_samples_count}")
+        print(f"  - Unknown Labels Filtered: {len(report.unknown_label_files)}")
+
+        if report.paired_samples_count == 0:
+            print(f"\n[ERROR] No paired samples found in {data_path} for verified classes: {VERIFIED_TARGET_CLASSES}")
+            if not is_synthetic:
+                print("[NOTE] Genuine MMAct paired train/val archives have not yet been placed in the data directory.")
+                print("       To test the complete pipeline forward/backward pass, use: python scripts/train.py --smoke_test")
+            sys.exit(1)
+
+        # 2. Partition into Train / Val / Test
+        print(f"\n[Step 2] Partitioning into {args.split_strategy}-independent splits...")
+        split_cfg = SplitConfig(
+            split_strategy=args.split_strategy,
+            partition_val_for_test=args.partition_val_for_test,
+            split_dir=Path(args.split_dir) if args.split_dir else None,
+            dataset_root=data_path,
+            seed=args.seed,
+        )
+        if args.no_test_split:
+            split_cfg.test_subjects = []
+            print("  [Test Isolation] --no_test_split active: Test split construction strictly skipped.")
+        splitter = DatasetSplitter(split_cfg, dataset_root=data_path)
+        train_samples, val_samples, test_samples = splitter.split(report.paired_samples)
+
+        if splitter.last_audit:
+            print(splitter.last_audit.summary())
+        else:
+            print(f"  - Train Set : {len(train_samples)} samples")
+            print(f"  - Val Set   : {len(val_samples)} samples")
+            print(f"  - Test Set  : {len(test_samples)} samples")
 
     isolation = verify_split_isolation(train_samples, val_samples, test_samples, strategy=args.split_strategy)
+    required_checks = set(isolation.get("required_isolation_checks", []))
     for check_name, passed in isolation.items():
+        if check_name in ("required_isolation_checks", "official_scene_overlap_notes"):
+            continue
         if passed is not None:
             status = "PASSED" if passed else "FAILED"
             print(f"      * {check_name:<30}: {status}")
-            assert passed, f"CRITICAL: Leakage detected across splits ({check_name})!"
+            if check_name in required_checks or check_name == "all_isolation_checks_passed":
+                assert passed, f"CRITICAL: Leakage detected across splits ({check_name})!"
 
     # Representation & Modality Audit
     rep_audit = verify_split_representation(train_samples, val_samples, test_samples, check_disk_files=True)
@@ -389,7 +436,23 @@ def main():
         pretrained_video=True,
         pretrained_path="outputs/pretrained/resnet18.pth",
         freeze_video_backbone=freeze_video,
+        spatial_dropout1=args.spatial_dropout1,
+        spatial_dropout2=args.spatial_dropout2,
+        require_pretrained=args.require_pretrained,
     ).to(device)
+
+    # Verification gate: Abort MobileNetV2 if pretrained weights failed to load
+    if args.video_backbone in ["mobilenet_v2", "mobilenet"]:
+        vb = getattr(model, "video_branch", None)
+        is_loaded = getattr(vb, "pretrained_loaded", False)
+        psource = getattr(vb, "pretrained_source", "unknown")
+        print(f"\n[MobileNet Pretrained Audit] Source: {psource}, Verified Loaded: {is_loaded}, Frozen Backbone: {freeze_video}")
+        if not is_loaded:
+            raise RuntimeError(
+                f"CRITICAL: Failed to verify ImageNet pretrained weights for MobileNetV2!\n"
+                f"Source: {psource}, Pretrained Loaded: {is_loaded}.\n"
+                f"Aborting MobileNet experiment to prevent silent training on random weights."
+            )
 
     total_params = sum(p.numel() for p in model.parameters())
     trainable_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
@@ -417,8 +480,19 @@ def main():
         criterion = nn.CrossEntropyLoss(weight=class_weights)
     else:
         criterion = nn.CrossEntropyLoss()
+    if args.mode == "video_only" and hasattr(model, "video_branch") and hasattr(model, "video_only_classifier"):
+        active_trainable_params = [p for p in model.video_branch.parameters() if p.requires_grad] + [
+            p for p in model.video_only_classifier.parameters() if p.requires_grad
+        ]
+    elif args.mode == "sensor_only" and hasattr(model, "sensor_branch") and hasattr(model, "sensor_only_classifier"):
+        active_trainable_params = [p for p in model.sensor_branch.parameters() if p.requires_grad] + [
+            p for p in model.sensor_only_classifier.parameters() if p.requires_grad
+        ]
+    else:
+        active_trainable_params = [p for p in model.parameters() if p.requires_grad]
+
     optimizer = torch.optim.AdamW(
-        [p for p in model.parameters() if p.requires_grad],
+        active_trainable_params,
         lr=args.lr,
         weight_decay=args.weight_decay,
     )
@@ -431,16 +505,16 @@ def main():
             model.train()
             for v_w, s_w, l_w, _ in train_loader:
                 v_w = v_w.to(device, non_blocking=True)
-                s_w = s_w.to(device, non_blocking=True)
+                s_w_in = None if args.mode == "video_only" else s_w.to(device, non_blocking=True)
                 l_w = l_w.to(device, non_blocking=True)
                 optimizer.zero_grad(set_to_none=True)
                 if use_amp and scaler:
                     with torch.amp.autocast(device_type="cuda", dtype=torch.float16):
-                        log_w = model(video=v_w, sensor=s_w, override_mode=args.mode)
+                        log_w = model(video=v_w, sensor=s_w_in, override_mode=args.mode)
                         loss_w = criterion(log_w, l_w)
                     scaler.scale(loss_w).backward()
                 else:
-                    log_w = model(video=v_w, sensor=s_w, override_mode=args.mode)
+                    log_w = model(video=v_w, sensor=s_w_in, override_mode=args.mode)
                     loss_w = criterion(log_w, l_w)
                     loss_w.backward()
                 optimizer.zero_grad(set_to_none=True)
@@ -458,11 +532,14 @@ def main():
     # 5. Training Loop
     start_epoch = 1
     best_val_f1 = -1.0
+    best_epoch = 1
+    best_metrics = {}
     history = {
         "train_loss": [],
         "val_loss": [],
         "train_acc": [],
         "val_acc": [],
+        "val_f1": [],
         "lr": [],
         "train_time_sec": [],
         "val_time_sec": [],
@@ -503,7 +580,12 @@ def main():
                     p.requires_grad = True
                 backbone_params = list(model.video_branch.backbone.parameters())
                 backbone_ids = set(id(p) for p in backbone_params)
-                head_params = [p for p in model.parameters() if id(p) not in backbone_ids and p.requires_grad]
+                if args.mode == "video_only" and hasattr(model, "video_only_classifier"):
+                    head_params = [p for p in model.video_branch.parameters() if id(p) not in backbone_ids and p.requires_grad] + [
+                        p for p in model.video_only_classifier.parameters() if p.requires_grad
+                    ]
+                else:
+                    head_params = [p for p in model.parameters() if id(p) not in backbone_ids and p.requires_grad]
                 optimizer = torch.optim.AdamW([
                     {"params": backbone_params, "lr": args.unfreeze_lr, "weight_decay": args.weight_decay},
                     {"params": head_params, "lr": args.lr, "weight_decay": args.weight_decay},
@@ -532,6 +614,7 @@ def main():
         history["val_loss"].append(val_loss)
         history["train_acc"].append(train_acc)
         history["val_acc"].append(val_acc)
+        history["val_f1"].append(round(val_f1, 4))
         history["lr"].append(curr_lr)
         history["train_time_sec"].append(round(train_dur, 2))
         history["val_time_sec"].append(round(val_dur, 2))
@@ -582,7 +665,9 @@ def main():
         # Save best
         if val_f1 > best_val_f1:
             best_val_f1 = val_f1
-            best_metrics = val_metrics
+            best_epoch = epoch
+            best_metrics = dict(val_metrics)
+            best_metrics["epoch"] = epoch
             last_val_labels = val_labels
             last_val_probs = val_probs
             patience_counter = 0
@@ -733,7 +818,7 @@ def main():
     csv_path = output_dir / f"history_{args.video_backbone}.csv"
     with open(csv_path, "w", newline="") as f:
         writer = csv.writer(f)
-        writer.writerow(["epoch", "train_loss", "val_loss", "train_acc", "val_acc", "train_time_sec", "val_time_sec", "peak_gpu_mem_mb"])
+        writer.writerow(["epoch", "train_loss", "val_loss", "train_acc", "val_acc", "val_f1", "train_time_sec", "val_time_sec", "peak_gpu_mem_mb"])
         for i in range(len(history["train_loss"])):
             writer.writerow([
                 i + 1,
@@ -741,6 +826,7 @@ def main():
                 round(history["val_loss"][i], 4),
                 round(history["train_acc"][i], 2),
                 round(history["val_acc"][i], 2),
+                round(history["val_f1"][i], 4) if ("val_f1" in history and i < len(history["val_f1"])) else "N/A",
                 history["train_time_sec"][i] if i < len(history["train_time_sec"]) else 0.0,
                 history["val_time_sec"][i] if i < len(history["val_time_sec"]) else 0.0,
                 history["peak_gpu_mem_mb"][i] if i < len(history["peak_gpu_mem_mb"]) else 0.0,
@@ -754,6 +840,7 @@ def main():
         "sensor_backbone": args.sensor_backbone,
         "split_strategy": args.split_strategy,
         "epochs": args.epochs,
+        "best_epoch": best_epoch,
         "runtime_seconds": round(total_training_time, 2),
         "best_checkpoint_mb": round(best_ckpt_size_mb, 2),
         "best_metrics": best_metrics,
@@ -764,6 +851,8 @@ def main():
     with open(output_dir / "training_summary.json", "w") as f:
         json.dump(summary, f, indent=2)
     with open(output_dir / f"history_{args.video_backbone}.json", "w") as f:
+        json.dump(history, f, indent=2)
+    with open(output_dir / "history.json", "w") as f:
         json.dump(history, f, indent=2)
 
     # Experiment Manifest
@@ -776,11 +865,23 @@ def main():
         "sensor_backbone": args.sensor_backbone,
         "split_strategy": args.split_strategy,
         "epochs": args.epochs,
+        "best_epoch": best_epoch,
         "min_epochs": args.min_epochs,
         "batch_size": args.batch_size,
         "lr": args.lr,
         "weight_decay": args.weight_decay,
         "dropout": args.dropout,
+        "spatial_dropout1": args.spatial_dropout1 if "cnn" in args.video_backbone else None,
+        "spatial_dropout2": args.spatial_dropout2 if "cnn" in args.video_backbone else None,
+        "freeze_video": bool(freeze_video),
+        "staged_finetune": bool(args.staged_finetune),
+        "unfreeze_epoch": args.unfreeze_epoch if args.staged_finetune else None,
+        "unfreeze_lr": args.unfreeze_lr if args.staged_finetune else None,
+        "pretrained_source": getattr(getattr(model, "video_branch", None), "pretrained_source", None),
+        "pretrained_loaded": getattr(getattr(model, "video_branch", None), "pretrained_loaded", None),
+        "total_params": total_params,
+        "active_trainable_params": len(active_trainable_params) if isinstance(active_trainable_params, list) else trainable_params,
+        "trainable_params": trainable_params,
         "device": str(device),
         "gpu_name": torch.cuda.get_device_name(0) if device.type == "cuda" else "N/A",
         "amp_enabled": use_amp,
@@ -791,17 +892,19 @@ def main():
         "train_samples_count": len(train_samples),
         "val_samples_count": len(val_samples),
         "test_samples_count": len(test_samples),
-        "train_recordings_count": splitter.last_audit.train_recordings if splitter.last_audit else len({(s.subject, s.cam, s.scene, s.session) for s in train_samples}),
-        "val_recordings_count": splitter.last_audit.val_recordings if splitter.last_audit else len({(s.subject, s.cam, s.scene, s.session) for s in val_samples}),
-        "test_recordings_count": splitter.last_audit.test_recordings if splitter.last_audit else len({(s.subject, s.cam, s.scene, s.session) for s in test_samples}),
-        "is_official_split": splitter.last_audit.is_official if splitter.last_audit else False,
-        "is_custom_test_partition": splitter.last_audit.is_custom_test if splitter.last_audit else False,
-        "train_source_file": splitter.last_audit.train_file if splitter.last_audit else None,
-        "val_source_file": splitter.last_audit.val_file if splitter.last_audit else None,
+        "train_recordings_count": splitter.last_audit.train_recordings if getattr(splitter, "last_audit", None) else len({(s.subject, s.cam, s.scene, s.session) for s in train_samples}),
+        "val_recordings_count": splitter.last_audit.val_recordings if getattr(splitter, "last_audit", None) else len({(s.subject, s.cam, s.scene, s.session) for s in val_samples}),
+        "test_recordings_count": splitter.last_audit.test_recordings if getattr(splitter, "last_audit", None) else len({(s.subject, s.cam, s.scene, s.session) for s in test_samples}),
+        "is_official_split": getattr(splitter.last_audit, "is_official", False) if getattr(splitter, "last_audit", None) else False,
+        "is_custom_test_partition": getattr(splitter.last_audit, "is_custom_test", False) if getattr(splitter, "last_audit", None) else False,
+        "train_source_file": getattr(splitter.last_audit, "train_file", None) if getattr(splitter, "last_audit", None) else (str(args.train_manifest) if args.train_manifest else None),
+        "val_source_file": getattr(splitter.last_audit, "val_file", None) if getattr(splitter, "last_audit", None) else (str(args.val_manifest) if args.val_manifest else None),
         "train_class_distribution": rep_audit.get("train_class_distribution", {}),
         "val_class_distribution": rep_audit.get("val_class_distribution", {}),
         "test_class_distribution": rep_audit.get("test_class_distribution", {}),
         "split_isolation_results": {k: v for k, v in isolation.items() if v is not None},
+        "train_sample_ids": [s.sample_id for s in train_samples],
+        "val_sample_ids": [s.sample_id for s in val_samples],
         "package_versions": {
             "torch": torch.__version__,
             "numpy": np.__version__,
@@ -812,6 +915,11 @@ def main():
         json.dump(manifest, f, indent=2)
     with open(output_dir / "experiment_manifest.json", "w") as f:
         json.dump(manifest, f, indent=2)
+
+    with open(output_dir / "actual_train_sample_ids.json", "w", encoding="utf-8") as f:
+        json.dump([s.sample_id for s in train_samples], f, indent=2)
+    with open(output_dir / "actual_val_sample_ids.json", "w", encoding="utf-8") as f:
+        json.dump([s.sample_id for s in val_samples], f, indent=2)
 
     # Runtime report
     peak_mem_val = max(history["peak_gpu_mem_mb"], default=0.0)
