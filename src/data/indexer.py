@@ -12,7 +12,7 @@ import os
 import re
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Set, Tuple
+from typing import Any, Dict, List, Optional, Set, Tuple, Union
 
 from src.config import (
     VERIFIED_TARGET_CLASSES,
@@ -125,13 +125,17 @@ class MMActIndexer:
 
     def __init__(
         self,
-        dataset_root: Path,
+        dataset_root: Optional[Union[str, Path]] = None,
         required_sensor_modalities: Optional[List[str]] = None,
         target_classes: Optional[List[str]] = None,
         excluded_subjects: Optional[Set[str]] = None,
         allowed_subjects: Optional[Set[str]] = None,
+        data_root: Optional[Union[str, Path]] = None,
     ):
-        self.dataset_root = Path(dataset_root)
+        root = dataset_root if dataset_root is not None else data_root
+        if root is None:
+            raise ValueError("MMActIndexer requires either 'dataset_root' or 'data_root' parameter.")
+        self.dataset_root = Path(root)
         self.required_sensors = (
             required_sensor_modalities
             if required_sensor_modalities is not None

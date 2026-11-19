@@ -190,3 +190,104 @@ def test_mobilenet_verified_pretrained_gate():
     assert branch.pretrained_loaded is True
     assert branch.pretrained_source in {"torchvision-default", "torchvision-legacy", "pure-pytorch-external"}
 
+
+def test_indexer_data_root_alias(tmp_path):
+    from src.data.indexer import MMActIndexer
+    # Both dataset_root and data_root should work identically
+    idx1 = MMActIndexer(dataset_root=tmp_path)
+    assert idx1.dataset_root == tmp_path
+
+    idx2 = MMActIndexer(data_root=tmp_path)
+    assert idx2.dataset_root == tmp_path
+
+    idx3 = MMActIndexer(tmp_path)
+    assert idx3.dataset_root == tmp_path
+
+
+def test_screening_verifier_logic(tmp_path):
+    import json
+    import pytest
+    from scripts.verify_screening_metrics import (
+        validate_single_experiment,
+        verify_screening_runs,
+        EXPECTED_EXPERIMENTS,
+    )
+
+    # 1. Create canonical manifests
+    train_manifest = tmp_path / "canonical_train_manifest.json"
+    val_manifest = tmp_path / "canonical_val_manifest.json"
+
+    train_samples = [
+        {"sample_id": f"s_train_{i}", "subject": "subject1", "action": "crouching"}
+        for i in range(10)
+    ]
+    val_samples = [
+        {"sample_id": f"s_val_{i}", "subject": "subject15", "action": "crouching"}
+        for i in range(5)
+    ]
+
+    train_manifest.write_text(json.dumps(train_samples))
+    val_manifest.write_text(json.dumps(val_samples))
+
+    canonical_train_ids = [s["sample_id"] for s in train_samples]
+    canonical_val_ids = [s["sample_id"] for s in val_samples]
+
+    results_dir = tmp_path / "screening_results"
+    results_dir.mkdir()
+
+    # 2. Build 5 valid experiment mock outputs
+    for exp in EXPECTED_EXPERIMENTS:
+        exp_dir = results_dir / exp["name"]
+        exp_dir.mkdir()
+        (exp_dir / "actual_train_sample_ids.json").write_text(json.dumps(canonical_train_ids))
+        (exp_dir / "actual_val_sample_ids.json").write_text(json.dumps(canonical_val_ids))
+
+        # 12 epochs
+        history = {
+            "train_loss": [2.0 - i * 0.1 for i in range(12)],
+            "val_loss": [1.9 - i * 0.08 for i in range(12)],
+            "val_f1": [0.3 + i * 0.02 for i in range(12)],  # max at epoch 12
+        }
+        (exp_dir / "history.json").write_text(json.dumps(history))
+
+        manifest = {"video_backbone": exp["backbone"]}
+        (exp_dir / "experiment_manifest.json").write_text(json.dumps(manifest))
+
+        summary = {
+            "best_epoch": 12,
+            "runtime_seconds": 120.0,
+            "best_metrics": {
+                "macro_f1": 0.52,
+                "accuracy": 0.60,
+                "loss": 1.02,
+                "per_class": {
+                    cls_name: {"precision": 0.6, "recall": 0.6, "f1-score": 0.6, "support": 5}
+                    for cls_name in [
+                        "crouching", "jumping", "kicking", "pointing", "running",
+                        "sitting", "standing", "using_phone", "walking", "waving_hand",
+                    ]
+                },
+            },
+        }
+        (exp_dir / "training_summary.json").write_text(json.dumps(summary))
+
+    # Test full verification run
+    results, selection = verify_screening_runs(
+        results_dir=results_dir,
+        train_manifest_path=train_manifest,
+        val_manifest_path=val_manifest,
+        expected_epochs=12,
+    )
+    assert len(results) == 5
+    assert "custom_cnn_winner" in selection
+    assert "mobilenet_v2_winner" in selection
+
+    # 3. Test failure on incomplete run (<12 epochs)
+    corrupted_dir = results_dir / EXPECTED_EXPERIMENTS[0]["name"]
+    with open(corrupted_dir / "history.json", "w") as f:
+        json.dump({"train_loss": [1.0] * 10, "val_loss": [1.0] * 10, "val_f1": [0.5] * 10}, f)
+
+    with pytest.raises(AssertionError, match="Incomplete run"):
+        validate_single_experiment(corrupted_dir, canonical_train_ids, canonical_val_ids, expected_epochs=12)
+
+
